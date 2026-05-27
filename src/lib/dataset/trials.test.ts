@@ -79,6 +79,12 @@ describe("getTrial", () => {
     expect(detail.rawTrajectory).toContain("ATIF-v1.6");
   });
 
+  it("loads the oracle solve output (agent/oracle.txt)", async () => {
+    const oracle = (await getTaskTrials("alpha-task", FIXTURE)).find((t) => t.isOracle)!;
+    const detail = (await getTrial("alpha-task", oracle.id, FIXTURE))!;
+    expect(detail.solveOutput).toContain("solve complete");
+  });
+
   it("returns null for an unknown trial id", async () => {
     expect(await getTrial("alpha-task", "deadbeef", FIXTURE)).toBeNull();
   });

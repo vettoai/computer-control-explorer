@@ -28,6 +28,7 @@ export interface TrialDetail extends Trial {
   trajectory: ParsedAtifResult | null;
   rawTrajectory: string | null;
   testOutput: string | null;
+  solveOutput: string | null; // oracle solve stdout (agent/oracle.txt); null for agent trials
   error: string | null;
 }
 

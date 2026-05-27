@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { TrajectoryViewer } from "@/components/trajectory/trajectory-viewer";
 import { modelLabel, type TrialDetail } from "@/lib/dataset/trial-types";
 import { parseAtifTrajectory } from "@/lib/trajectory/atif";
+import { cn } from "@/lib/utils";
 
 /** Parsed entries are derived from rawTrajectory on the client, so we never embed them. */
 type TrialViewModel = Omit<TrialDetail, "trajectory">;
+
+type TabKey = "trajectory" | "test" | "solve";
+const TAB_LABELS: Record<TabKey, string> = {
+  trajectory: "Trajectory",
+  test: "Test output",
+  solve: "Solve output",
+};
 
 function Outcome({ trial }: { trial: TrialViewModel }) {
   if (trial.reward === null) {
@@ -57,6 +65,9 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
     () => (trial.rawTrajectory ? parseAtifTrajectory(trial.rawTrajectory).entries : []),
     [trial.rawTrajectory],
   );
+  // Oracle solves have no trajectory — show their solve output instead.
+  const tabs: TabKey[] = trial.isOracle ? ["solve", "test"] : ["trajectory", "test"];
+  const [tab, setTab] = useState<TabKey>(tabs[0]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
@@ -99,19 +110,67 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
         </div>
       )}
 
-      <h2 className="mt-8 mb-2 text-sm font-semibold">Trajectory</h2>
-      <div className="flex h-[70vh] flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-        <TrajectoryViewer entries={entries} rawContent={trial.rawTrajectory} />
+      <div className="mt-8 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        {tabs.map((t) => (
+          <TabBtn key={t} active={tab === t} onClick={() => setTab(t)}>
+            {TAB_LABELS[t]}
+          </TabBtn>
+        ))}
       </div>
 
-      <h2 className="mt-8 mb-2 text-sm font-semibold">Test output</h2>
-      {trial.testOutput ? (
-        <pre className="max-h-[50vh] overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs leading-relaxed dark:border-zinc-800 dark:bg-zinc-900">
-          {trial.testOutput}
-        </pre>
-      ) : (
-        <p className="text-sm text-zinc-500">No verifier output captured for this trial.</p>
-      )}
+      <div className="mt-4 h-[70vh]">
+        {tab === "trajectory" && (
+          <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+            <TrajectoryViewer entries={entries} rawContent={trial.rawTrajectory} />
+          </div>
+        )}
+        {tab === "test" && (
+          <OutputPane content={trial.testOutput} empty="No verifier output captured for this trial." />
+        )}
+        {tab === "solve" && (
+          <OutputPane content={trial.solveOutput} empty="No solve output captured for this trial." />
+        )}
+      </div>
     </div>
+  );
+}
+
+function TabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+        active
+          ? "border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
+          : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function OutputPane({ content, empty }: { content: string | null; empty: string }) {
+  if (!content?.trim()) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700">
+        {empty}
+      </div>
+    );
+  }
+  return (
+    <pre className="h-full overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs leading-relaxed dark:border-zinc-800 dark:bg-zinc-900">
+      {content}
+    </pre>
   );
 }
