@@ -34,8 +34,15 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
           {stats.map((s) => (
             <tr key={`${s.model}-${s.checksum}`}>
               <td className="px-3 py-2 font-medium">{s.modelLabel}</td>
-              <td className="px-3 py-2 font-mono text-xs text-zinc-500" title={s.checksum}>
-                {shortChecksum(s.checksum)}
+              <td className="px-3 py-2" title={s.checksum}>
+                {s.versionLabel ? (
+                  <>
+                    <div>{s.versionLabel}</div>
+                    <div className="font-mono text-xs text-zinc-400">{shortChecksum(s.checksum)}</div>
+                  </>
+                ) : (
+                  <span className="font-mono text-xs text-zinc-500">{shortChecksum(s.checksum)}</span>
+                )}
               </td>
               <td className="px-3 py-2 text-right tabular-nums">{s.trials}</td>
               <td className="px-3 py-2 text-right tabular-nums">
