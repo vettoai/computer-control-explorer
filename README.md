@@ -51,7 +51,8 @@ python3 -m http.server -d out 8080      # or: npx serve out
 ```
 
 **Docker** — a dataset-agnostic server image; mount the bundle as a volume and it reads
-it at request time. Pull the published image (CI builds & pushes it on each release tag):
+it at request time. Pull the published multi-arch (amd64/arm64) image from Docker Hub —
+CI builds & pushes `vettoai/computer-control-explorer` on each release tag:
 
 ```bash
 docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
