@@ -1,0 +1,14 @@
+{
+  "schema_version": "ATIF-v1.6",
+  "agent": { "name": "terminus-2", "model_name": "litellm_proxy/vertex_ai/gemini-3-flash-preview" },
+  "steps": [
+    {
+      "source": "agent",
+      "message": "Analysis: reproduce the panic.",
+      "tool_calls": [
+        { "tool_call_id": "b1", "function_name": "bash", "arguments": { "keystrokes": "cargo test" } }
+      ],
+      "observation": { "results": [{ "source_call_id": "b1", "content": "ok\nProcess exited with code 0" }] }
+    }
+  ]
+}
