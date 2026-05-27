@@ -51,7 +51,14 @@ python3 -m http.server -d out 8080      # or: npx serve out
 ```
 
 **Docker** — a dataset-agnostic server image; mount the bundle as a volume and it reads
-it at request time:
+it at request time. Pull the published image (CI builds & pushes it on each release tag):
+
+```bash
+docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
+  YOUR_DOCKERHUB_NAMESPACE/computer-control-explorer
+```
+
+…or build it locally:
 
 ```bash
 docker build -t computer-control-explorer .
@@ -61,9 +68,10 @@ docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
 
 ## What it shows
 
-Per task: files + metadata, and a **Trials** tab with pass rate by model × task version
-(`task_checksum`), the oracle solve, and every agent trial — each with its parsed + raw
-**trajectory** (ATIF; terminus-2 and codex), **test output**, and reward.
+Per task: a collapsible **file tree** with syntax-highlighted file contents and metadata,
+and a **Trials** tab with pass rate by run (model × task version × job folder), the oracle
+solve, and every agent trial — each with its parsed + raw **trajectory** (ATIF; terminus-2
+and codex), **test output**, and reward. Crashed runs surface their error inline.
 
 ## License
 
