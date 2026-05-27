@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   getTaskTrials,
   getTrial,
+  globalRunStats,
   listTrials,
   modelLabel,
   taskTrialStats,
+  type Trial,
 } from "./trials";
 
 const FIXTURE = path.join(import.meta.dirname, "__fixtures__/mini");
@@ -87,5 +89,62 @@ describe("modelLabel", () => {
   it("keeps the final path segment", () => {
     expect(modelLabel("litellm_proxy/vertex_ai/gemini-3.5-flash")).toBe("gemini-3.5-flash");
     expect(modelLabel(null)).toBe("unknown");
+  });
+});
+
+function mkTrial(over: Partial<Trial>): Trial {
+  return {
+    id: Math.random().toString(36).slice(2),
+    slug: "t",
+    taskName: "t",
+    taskChecksum: "CHK",
+    agent: "terminus-2",
+    model: "litellm_proxy/vertex_ai/gemini-3.5-flash",
+    isOracle: false,
+    reward: 0,
+    passed: false,
+    startedAt: null,
+    finishedAt: null,
+    durationSec: null,
+    jobLabel: "run",
+    relPath: "p",
+    ...over,
+  };
+}
+
+describe("globalRunStats", () => {
+  it("aggregates across tasks per run, counts distinct tasks/solved, includes oracle last", () => {
+    const trials: Trial[] = [
+      mkTrial({ slug: "a", reward: 1, passed: true, jobLabel: "gemini-nohints" }),
+      mkTrial({ slug: "b", reward: 0, passed: false, jobLabel: "gemini-nohints" }),
+      mkTrial({ slug: "a", reward: 1, passed: true, jobLabel: "gemini-nohints" }), // re-trial of a
+      mkTrial({
+        slug: "a",
+        reward: 1,
+        passed: true,
+        jobLabel: "oracle",
+        agent: "oracle",
+        model: null,
+        isOracle: true,
+      }),
+    ];
+    const stats = globalRunStats(trials);
+    expect(stats).toHaveLength(2); // one gemini run + one oracle run
+
+    const gem = stats.find((s) => s.jobLabel === "gemini-nohints")!;
+    expect(gem).toMatchObject({
+      agent: "terminus-2",
+      modelLabel: "gemini-3.5-flash",
+      isOracle: false,
+      tasks: 2, // a, b
+      trials: 3,
+      passes: 2,
+      tasksSolved: 1, // only a ever passed
+    });
+    expect(gem.passRate).toBeCloseTo(2 / 3);
+    expect(gem.meanReward).toBeCloseTo((1 + 0 + 1) / 3);
+
+    // oracle is included and sorted to the bottom (reference ceiling)
+    expect(stats[stats.length - 1]).toMatchObject({ jobLabel: "oracle", isOracle: true, tasks: 1 });
   });
 });

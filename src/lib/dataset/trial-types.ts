@@ -43,6 +43,22 @@ export interface ModelStat {
   meanReward: number | null;
 }
 
+/** Whole-dataset pass statistics for one run, aggregated across all tasks. Grouped by
+ * (agent × model × job folder); oracle is included as a run (the reference ceiling). */
+export interface GlobalRunStat {
+  jobLabel: string; // run identifier (out/jobs/<jobLabel>)
+  agent: string;
+  model: string | null;
+  modelLabel: string;
+  isOracle: boolean;
+  tasks: number; // distinct task slugs covered by this run
+  trials: number; // total trials across all tasks
+  passes: number; // trials with full reward
+  passRate: number; // passes / trials (micro pass@1)
+  tasksSolved: number; // distinct tasks solved at least once
+  meanReward: number | null; // mean reward across all trials
+}
+
 /** Strip litellm proxy / provider prefixes for display: keep the final path segment. */
 export function modelLabel(model: string | null): string {
   if (!model) return "unknown";

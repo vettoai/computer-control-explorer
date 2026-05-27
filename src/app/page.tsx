@@ -1,8 +1,10 @@
 import Image from "next/image";
 import { connection } from "next/server";
 
+import { GlobalStats } from "@/components/global-stats";
 import { TaskList } from "@/components/task-list";
 import { getDatasetInfo, listTasks } from "@/lib/dataset/loader";
+import { globalRunStats, listTrials } from "@/lib/dataset/trials";
 
 export default async function Home() {
   // Server (Docker / local-dir): opt into per-request rendering so the list reflects the
@@ -12,7 +14,12 @@ export default async function Home() {
   if (process.env.EXPLORER_MODE !== "export") {
     await connection();
   }
-  const [tasks, info] = await Promise.all([listTasks(), getDatasetInfo()]);
+  const [tasks, info, trials] = await Promise.all([
+    listTasks(),
+    getDatasetInfo(),
+    listTrials(),
+  ]);
+  const runStats = globalRunStats(trials);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -59,7 +66,10 @@ export default async function Home() {
           </p>
         </div>
       ) : (
-        <TaskList tasks={tasks} />
+        <>
+          <GlobalStats stats={runStats} />
+          <TaskList tasks={tasks} />
+        </>
       )}
     </div>
   );
