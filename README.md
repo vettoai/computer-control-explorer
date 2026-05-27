@@ -50,8 +50,14 @@ static file server with no rewrite rules:
 python3 -m http.server -d out 8080      # or: npx serve out
 ```
 
-A **Docker** image (mount a dataset volume, read at runtime) is also planned — see the
-packaging section of [`PLAN.md`](PLAN.md).
+**Docker** — a dataset-agnostic server image; mount the bundle as a volume and it reads
+it at request time:
+
+```bash
+docker build -t computer-control-explorer .
+docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
+  computer-control-explorer
+```
 
 ## What it shows
 

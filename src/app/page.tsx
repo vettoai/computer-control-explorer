@@ -1,7 +1,16 @@
+import { connection } from "next/server";
+
 import { TaskList } from "@/components/task-list";
 import { listTasks } from "@/lib/dataset/loader";
 
 export default async function Home() {
+  // Server (Docker / local-dir): opt into per-request rendering so the list reflects the
+  // dataset mounted at runtime, which isn't present at build time. Export: skip, so the
+  // page is prerendered statically against the build-time dataset. (Task and trial pages
+  // already render on demand via generateStaticParams + dynamicParams.)
+  if (process.env.EXPLORER_MODE !== "export") {
+    await connection();
+  }
   const tasks = await listTasks();
 
   return (
