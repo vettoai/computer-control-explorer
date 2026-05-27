@@ -21,6 +21,8 @@ jobs:
       - run: npm run build
 
   # Guards the deliverable: the static export must always succeed and emit out/.
+  # Exports the committed mini fixture so the run is hermetic and exercises the full
+  # path — including task pages (output: export rejects an empty generateStaticParams).
   static-export:
     runs-on: ubuntu-latest
     steps:
@@ -30,5 +32,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: EXPLORER_MODE=export npm run build
-      - run: test -f out/index.html && echo "static export OK"
+      - run: EXPLORER_MODE=export DATASET_DIR="$PWD/src/lib/dataset/__fixtures__/mini" npm run build
+      - run: test -f out/index.html
+      - run: test -f out/task/alpha-task.html
+      - run: echo "static export OK"
