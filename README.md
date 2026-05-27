@@ -55,7 +55,7 @@ it at request time. Pull the published image (CI builds & pushes it on each rele
 
 ```bash
 docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
-  YOUR_DOCKERHUB_NAMESPACE/computer-control-explorer
+  vettoai/computer-control-explorer
 ```
 
 …or build it locally:
