@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { FileTree } from "@/components/file-tree";
+import { ancestorDirs, buildFileTree } from "@/lib/dataset/file-tree";
 import type { TaskDetail } from "@/lib/dataset/types";
-import { cn } from "@/lib/utils";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -14,38 +15,40 @@ function formatBytes(bytes: number): string {
 const DEFAULT_FILES = ["instruction.md", "README.md", "task.toml"];
 
 export function TaskFiles({ task }: { task: TaskDetail }) {
+  const tree = useMemo(() => buildFileTree(task.files), [task.files]);
   const defaultPath =
     DEFAULT_FILES.map((p) => task.files.find((f) => f.path === p)?.path).find(Boolean) ??
     task.files[0]?.path ??
     null;
+
   const [selected, setSelected] = useState<string | null>(defaultPath);
+  // Open the folders leading to the initially-selected file; everything else collapsed.
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(defaultPath ? ancestorDirs(defaultPath) : []),
+  );
+
   const file = task.files.find((f) => f.path === selected) ?? null;
+
+  function toggleDir(path: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
       <aside>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Files
-        </h2>
-        <ul className="space-y-0.5">
-          {task.files.map((f) => (
-            <li key={f.path}>
-              <button
-                type="button"
-                onClick={() => setSelected(f.path)}
-                className={cn(
-                  "w-full truncate rounded px-2 py-1 text-left font-mono text-xs transition-colors",
-                  selected === f.path
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
-                )}
-                title={f.path}
-              >
-                {f.path}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Files</h2>
+        <FileTree
+          nodes={tree}
+          selected={selected}
+          expanded={expanded}
+          onToggleDir={toggleDir}
+          onSelectFile={setSelected}
+        />
       </aside>
 
       <section className="min-w-0">
