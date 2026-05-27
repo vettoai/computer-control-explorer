@@ -23,6 +23,7 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
       <table className="w-full text-sm">
         <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-400 dark:bg-zinc-900">
           <tr>
+            <th className="px-3 py-2 font-medium">Run</th>
             <th className="px-3 py-2 font-medium">Model</th>
             <th className="px-3 py-2 font-medium">Version</th>
             <th className="px-3 py-2 text-right font-medium">Trials</th>
@@ -32,17 +33,11 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {stats.map((s) => (
-            <tr key={`${s.model}-${s.checksum}`}>
+            <tr key={`${s.jobLabel}-${s.model}-${s.checksum}`}>
+              <td className="px-3 py-2 font-mono text-xs">{s.jobLabel}</td>
               <td className="px-3 py-2 font-medium">{s.modelLabel}</td>
-              <td className="px-3 py-2" title={s.checksum}>
-                {s.versionLabel ? (
-                  <>
-                    <div>{s.versionLabel}</div>
-                    <div className="font-mono text-xs text-zinc-400">{shortChecksum(s.checksum)}</div>
-                  </>
-                ) : (
-                  <span className="font-mono text-xs text-zinc-500">{shortChecksum(s.checksum)}</span>
-                )}
+              <td className="px-3 py-2 font-mono text-xs text-zinc-500" title={s.checksum}>
+                {shortChecksum(s.checksum)}
               </td>
               <td className="px-3 py-2 text-right tabular-nums">{s.trials}</td>
               <td className="px-3 py-2 text-right tabular-nums">
@@ -64,21 +59,22 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
 
 function TrialRow({ slug, trial }: { slug: string; trial: Trial }) {
   const started = trial.startedAt ? new Date(trial.startedAt).toLocaleString() : "—";
+  // In job-grouped sections the run is the heading, so each row shows the model
+  // (oracle rows have no model — show the run folder instead).
+  const label = trial.isOracle ? trial.jobLabel : modelLabel(trial.model);
   return (
     <Link
       href={`/task/${slug}/t/${trial.id}`}
       className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-2 text-sm transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
     >
       <PassDot passed={trial.passed} reward={trial.reward} />
-      <span className="w-16 shrink-0 font-mono text-xs">
+      <span className="w-20 shrink-0 font-mono text-xs">
         {trial.reward === null ? "no result" : `reward ${trial.reward}`}
       </span>
-      <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-500" title={trial.jobLabel}>
-        {trial.jobLabel}
-      </span>
+      <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
       <span className="shrink-0 text-xs text-zinc-400">{started}</span>
       {trial.durationSec != null && (
-        <span className="w-12 shrink-0 text-right text-xs text-zinc-400 tabular-nums">
+        <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-400">
           {trial.durationSec}s
         </span>
       )}
@@ -106,21 +102,24 @@ export function TaskTrials({
   const oracle = trials.filter((t) => t.isOracle);
   const agentTrials = trials.filter((t) => !t.isOracle);
 
-  // Group agent trials by model label for display.
-  const byModel = new Map<string, Trial[]>();
+  // Group agent trials by job folder (the run); sections ordered by earliest start.
+  const byJob = new Map<string, Trial[]>();
   for (const t of agentTrials) {
-    const key = modelLabel(t.model);
-    (byModel.get(key) ?? byModel.set(key, []).get(key)!).push(t);
+    (byJob.get(t.jobLabel) ?? byJob.set(t.jobLabel, []).get(t.jobLabel)!).push(t);
   }
+  const jobSections = [...byJob.entries()].sort((a, b) =>
+    (a[1][0].startedAt ?? "").localeCompare(b[1][0].startedAt ?? ""),
+  );
 
   return (
     <div className="space-y-8">
       {stats.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold">Pass rate by model and task version</h2>
+          <h2 className="mb-2 text-sm font-semibold">Pass rate by run</h2>
           <p className="mb-3 text-xs text-zinc-500">
-            Grouped by <span className="font-mono">task_checksum</span> — the immutable task
-            version. Pass = full reward (1.0). Oracle solves are excluded.
+            Grouped by job folder and task version (
+            <span className="font-mono">task_checksum</span>). Pass = full reward (1.0).
+            Oracle solves are excluded.
           </p>
           <StatsTable stats={stats} />
         </section>
@@ -137,10 +136,10 @@ export function TaskTrials({
         </section>
       )}
 
-      {[...byModel.entries()].map(([label, group]) => (
-        <section key={label}>
-          <h2 className="mb-2 text-sm font-semibold">
-            {label} <span className="text-xs font-normal text-zinc-400">({group.length})</span>
+      {jobSections.map(([job, group]) => (
+        <section key={job}>
+          <h2 className="mb-2 font-mono text-sm font-semibold">
+            {job} <span className="text-xs font-normal text-zinc-400">({group.length})</span>
           </h2>
           <div className="space-y-1.5">
             {group.map((t) => (

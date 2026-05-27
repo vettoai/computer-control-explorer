@@ -42,19 +42,16 @@ function Field({
   value,
   mono,
   title,
-  sub,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   title?: string;
-  sub?: string;
 }) {
   return (
     <div title={title}>
       <dt className="text-xs text-zinc-400">{label}</dt>
       <dd className={mono ? "font-mono text-xs" : "text-sm"}>{value}</dd>
-      {sub && <dd className="font-mono text-xs text-zinc-400">{sub}</dd>}
     </div>
   );
 }
@@ -90,13 +87,7 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Field label="Agent" value={trial.agent} />
         {!trial.isOracle && <Field label="Model" value={trial.model ?? "—"} mono />}
-        <Field
-          label="Task version"
-          value={trial.versionLabel ?? trial.taskChecksum.slice(0, 12)}
-          mono={!trial.versionLabel}
-          title={trial.versionLabel ? trial.taskChecksum : undefined}
-          sub={trial.versionLabel ? trial.taskChecksum.slice(0, 12) : undefined}
-        />
+        <Field label="Task version" value={trial.taskChecksum.slice(0, 12)} mono title={trial.taskChecksum} />
         {trial.durationSec != null && <Field label="Duration" value={`${trial.durationSec}s`} />}
         <Field label="Job" value={trial.jobLabel} mono />
         {trial.startedAt && (
