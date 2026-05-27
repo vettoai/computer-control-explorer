@@ -35,10 +35,15 @@ function TrajectoryLoading() {
 
 function TrajectoryError({ error, folderPath }: { error: string; folderPath?: string | null }) {
   return (
-    <div className="px-5 py-20 text-center">
-      <p className="text-sm text-red-500">{error}</p>
+    <div className="flex min-h-0 flex-1 flex-col p-4">
+      <p className="mb-2 shrink-0 text-sm font-medium text-red-400">
+        Trial failed before producing a trajectory
+      </p>
+      <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded bg-red-950/30 p-3 text-xs text-red-300">
+        {error}
+      </pre>
       {folderPath && (
-        <p className="mt-2 text-xs text-zinc-400">
+        <p className="mt-2 shrink-0 text-xs text-zinc-400">
           Check <code className="rounded bg-zinc-800 px-1 py-0.5">{folderPath}</code> for details.
         </p>
       )}
@@ -117,17 +122,32 @@ function TrajectoryContent({
   rawContent: string | null;
   mode: "parsed" | "raw";
 }) {
-  if (mode === "parsed" && entries.length > 0) {
-    const base = entries[0]?.timestamp ?? 0;
-    const items = groupConsecutiveCommands(entries);
+  if (mode === "parsed") {
+    if (entries.length > 0) {
+      const base = entries[0]?.timestamp ?? 0;
+      const items = groupConsecutiveCommands(entries);
+      return (
+        <div className="divide-y divide-zinc-800 bg-zinc-950">
+          {items.map((item, i) =>
+            item.kind === "entry" ? (
+              <LogEntryRow key={item.entry.id} entry={item.entry} baseTimestamp={base} />
+            ) : (
+              <CommandGroup key={`grp-${i}`} entries={item.entries} baseTimestamp={base} />
+            ),
+          )}
+        </div>
+      );
+    }
+    // Failed/empty run: no agent steps to parse. Don't dump the raw file here.
     return (
-      <div className="divide-y divide-zinc-800 bg-zinc-950">
-        {items.map((item, i) =>
-          item.kind === "entry" ? (
-            <LogEntryRow key={item.entry.id} entry={item.entry} baseTimestamp={base} />
-          ) : (
-            <CommandGroup key={`grp-${i}`} entries={item.entries} baseTimestamp={base} />
-          ),
+      <div className="px-5 py-16 text-center text-sm text-zinc-500">
+        No agent steps were recorded for this trial.
+        {rawContent && (
+          <>
+            {" "}
+            Switch to <span className="font-medium text-zinc-300">Raw</span> to view the
+            trajectory file.
+          </>
         )}
       </div>
     );
@@ -189,7 +209,7 @@ export function TrajectoryViewer({
     wasAtBottom.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
   }
 
-  const canToggle = entries.length > 0 && (!!effectiveRaw || !!onFetchRaw);
+  const canToggle = !!effectiveRaw || !!onFetchRaw;
   const showCopy = mode === "raw" && !!effectiveRaw;
 
   return (
