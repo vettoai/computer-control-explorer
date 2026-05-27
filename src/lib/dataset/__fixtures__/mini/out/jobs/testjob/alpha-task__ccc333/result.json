@@ -1,0 +1,10 @@
+{
+  "trial_name": "alpha-task__ccc333",
+  "task_name": "vettoai/alpha-task",
+  "task_id": { "path": "dataset/alpha-task" },
+  "task_checksum": "CHK1",
+  "started_at": "2026-05-25T20:00:00Z",
+  "finished_at": "2026-05-25T20:02:00Z",
+  "config": { "agent": { "name": "oracle", "model_name": null } },
+  "verifier_result": { "rewards": { "reward": 1.0 } }
+}

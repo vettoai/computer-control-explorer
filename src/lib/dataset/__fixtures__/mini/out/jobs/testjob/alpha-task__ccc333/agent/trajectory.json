@@ -1,0 +1,14 @@
+{
+  "schema_version": "ATIF-v1.6",
+  "agent": { "name": "oracle", "model_name": null },
+  "steps": [
+    {
+      "source": "agent",
+      "message": "Applying the reference solution.",
+      "tool_calls": [
+        { "tool_call_id": "o1", "function_name": "bash", "arguments": { "keystrokes": "bash solution/solve.sh" } }
+      ],
+      "observation": { "results": [{ "source_call_id": "o1", "content": "ok\nProcess exited with code 0" }] }
+    }
+  ]
+}

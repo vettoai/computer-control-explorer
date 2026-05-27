@@ -1,0 +1,2 @@
+test_schema_recovery PASSED
+1 passed in 0.42s

@@ -1,0 +1,12 @@
+{
+  "trial_name": "alpha-task__bbb222",
+  "task_name": "vettoai/alpha-task",
+  "task_id": { "path": "dataset/alpha-task" },
+  "task_checksum": "CHK1",
+  "started_at": "2026-05-25T21:10:00Z",
+  "finished_at": "2026-05-25T21:14:00Z",
+  "config": {
+    "agent": { "name": "terminus-2", "model_name": "litellm_proxy/vertex_ai/gemini-3.5-flash" }
+  },
+  "verifier_result": { "rewards": { "reward": 0.0 } }
+}
