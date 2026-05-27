@@ -111,14 +111,17 @@ as a direct port; the only real engineering is the filesystem loader + the task 
 
 ---
 
-## 6. Sanitization (customer-facing)
+## 6. Display normalization (not sanitization)
 
-The model identity is a **feature, not a secret** — researchers want to know which model
-produced a trajectory. So we **show** the model; we only clean the internal *transport*
-plumbing. A small normalizer (in the loader): strip the `litellm_proxy/<provider>/` prefix
-on `config.agent.model_name` → display `gemini-3.5-flash` / `claude-opus-4-6` / `gpt-5.4`;
-hide our `total_cost_usd` (token counts optional); drop internal job-dir names from
-displayed paths. Configurable so an internal build can show everything (incl. cost).
+The explorer is a **read-only helper over the data we ship** — and we ship the raw `out/`
+alongside it — so it does **not** hide anything that's already in the files; masking in the
+UI would be pointless theater. (Job-dir names, etc. aren't internal — they're just the data.)
+The only normalization is **cosmetic**: render the model as a clean name by stripping the
+`litellm_proxy/<provider>/` transport prefix (`litellm_proxy/vertex_ai/gemini-3.5-flash` →
+`gemini-3.5-flash`) for readability. Token counts / cost are just data — show them or not as
+a UI choice (often useful to a researcher). If there's ever something we don't want a
+customer to have, that's an **export-time** decision (what goes into the bundled `out/`),
+**not** the viewer's job.
 
 ---
 
