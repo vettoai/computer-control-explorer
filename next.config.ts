@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   // Static export can't use the runtime Image Optimization API; the explorer is
   // text/data-driven, so disabling it everywhere keeps both targets identical.
   images: { unoptimized: true },
+  // For the export, emit every route as <route>/index.html. This serves correctly on
+  // any dumb static file server (no .html-extension rewrite needed) and avoids the
+  // task page (task/<slug>.html) colliding with the trial dir (task/<slug>/t/...).
+  trailingSlash: isExport,
 };
 
 export default nextConfig;

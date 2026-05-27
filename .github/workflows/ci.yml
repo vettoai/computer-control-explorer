@@ -33,7 +33,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: EXPLORER_MODE=export DATASET_DIR="$PWD/src/lib/dataset/__fixtures__/mini" npm run build
+      # trailingSlash export → every route is <route>/index.html
       - run: test -f out/index.html
-      - run: test -f out/task/alpha-task.html
-      - run: ls out/task/alpha-task/t/*.html # at least one trial page emitted
+      - run: test -f out/task/alpha-task/index.html
+      - run: ls out/task/alpha-task/t/*/index.html # at least one trial page emitted
       - run: echo "static export OK"
