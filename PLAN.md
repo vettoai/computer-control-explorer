@@ -72,9 +72,14 @@ publish; Docker + static export cover the cases.)
 **`DATASET_DIR` contract.** Points at a dataset bundle (e.g.
 `computer-control-202605-hard20/`). Reads:
 - `dataset/<slug>/` → task files + `task.toml` (category = first keyword).
-- eval runs (from the Harbor **export script** output we ship, or raw `out/jobs/`):
-  per trial, `trajectory.json` (ATIF), `verifier/`-style `result.json`, solve/oracle
-  output. Exact exported layout: **to confirm** (§10).
+- eval runs = the **`export_results.sh`** output (a zip of `out/jobs/`, minus heavy agent
+  internals — episodes, `.cast`, sqlite, panes — which we don't need). Per trial:
+  `out/jobs/<job>/<trial>/{result.json, agent/trajectory.json (ATIF), verifier/…}`. We ship
+  this `out/` alongside the bundle (which already carries `dataset/<slug>/`); `DATASET_DIR`
+  points at the bundle root.
+- **Oracle** runs usually aren't shipped. When present, an oracle trial is **just another
+  trajectory** — agent = `oracle`, model N/A, plus its solve output. No special path; same
+  renderer.
 
 ---
 
@@ -139,9 +144,10 @@ discipline curation enforces (COMMON_PITFALLS G2: never aggregate across checksu
 loader groups trials by `task_checksum`; within a version it computes per-model pass rate
 via the ported `run-result-utils`.
 
-**UI.** Trajectory picker shows **agent + model** per trial plus a **version selector**
-(checksum-grouped); the task view gets a small **stats table** — model × version → pass%
-(n trials).
+**UI.** We ship **k trials per task** (e.g. gemini-3.5-flash ×10), so **trial selection is
+core**: the picker drills version (checksum) → model → trial. Each trial shows agent +
+model; per-model pass rate is computed over its k trials. The task view gets a small
+**stats table** — model × version → pass% (n=k).
 
 **Version labels** (a checksum is opaque): attach a human label in order of preference —
 (a) an `explorer.json` manifest in the dataset mapping checksum → label; (b) auto-derive
@@ -165,9 +171,9 @@ Recommendation: **dynamic / group-by-checksum** as default; separate-export as t
   summary if runs present.
 - **B. Task detail** — file browser (syntax-highlighted) + metadata panel (`task.toml`).
 - **C. Trajectory view** — `TrajectoryViewer` (parsed commands + raw) + results
-  (`run-result-utils`) + solve output, with a **version selector** (checksum-grouped) and
-  the **model** shown per trial. Plus a per-task **stats table** (model × version → pass%).
-  Multi-trial runs side panel = stretch.
+  (`run-result-utils`), with the **trial picker** (version → model → trial, **core** since
+  k=10/task), the **model** shown per trial, and a per-task **stats table** (model ×
+  version → pass%). Solve output shown for oracle trials when present.
 
 ---
 
@@ -193,20 +199,19 @@ keep Arena-internal path references out of any public version of this doc.
 
 ---
 
-## 10. Open questions / to confirm before/while building
+## 10. Resolved decisions (was: open questions)
 
-1. **Exported-trajectory layout.** What the Harbor export script emits (dir structure,
-   filenames) vs raw `out/jobs/.../agent/trajectory.json` + `verifier/`. The loader targets
-   whichever we ship for hard20.
-2. **Solve/oracle output location** in our runs (oracle trial stdout) and whether Arena's
-   result view already sources it.
-3. **ATIF schema match** — confirm our `trajectory.json` passes `parseAtifTrajectory`
-   unchanged (it should; both are ATIF) and the `entries` render as expected.
-4. **Multiple trials per task** — do we ship k trials per task (then we need trial
-   selection / the runs panel) or one representative trial for the demo?
-5. **Version labeling & checksum behavior** — confirm hints/bumps yield distinct
-   `task_checksum`s (expected); pick the label source (manifest vs. auto-derive vs.
-   subfolder); decide whether hard20 ships flavor-bucketed `out/` subfolders or flat.
+1. **Layout** — read the `export_results.sh` output: `out/jobs/<job>/<trial>/{result.json,
+   agent/trajectory.json, verifier/}`, shipped alongside the bundle's `dataset/<slug>/`. ✅
+2. **Oracle/solve** — oracle is just another trajectory (agent=`oracle`); solve output is a
+   minor extra shown only when an oracle trial is present. Usually absent; low priority. ✅
+3. **ATIF** — same harness (Harbor + terminus-2), so `parseAtifTrajectory` should parse our
+   `trajectory.json` unchanged; verify the `entries` render while wiring M2. ✅
+4. **k trials/task** — yes (gemini-3.5-flash ×10) → trial selection is **core**. ✅
+
+**Still to pin while building:** version-label source (manifest vs. auto-derive vs.
+subfolder) and whether hard20 ships flat `out/` (auto group-by-checksum) or flavor-bucketed
+subfolders — confirm once the hard20 export is run.
 
 ---
 
@@ -214,7 +219,7 @@ keep Arena-internal path references out of any public version of this doc.
 
 - **M0** — repo scaffold + Next 16/Tailwind/shadcn base, `DATASET_DIR` plumbing, mode flag. *(scaffold done)*
 - **M1** — filesystem loader + **task list (category filter)** + **task detail** (files + metadata).
-- **M2** — port `parseAtifTrajectory` + `TrajectoryViewer` + `run-result-utils`; **trajectory view** (parsed + raw + results + solve), with sanitization.
-- **M3** — **static export** build wired end-to-end against the hard20 exported trajectories; produce a shippable `out/`.
+- **M2** — port `parseAtifTrajectory` + `TrajectoryViewer` + `run-result-utils`; **trajectory view** with the **trial picker** (group-by-`task_checksum` → model → trial), per-model **stats table**, and the cosmetic model-name cleanup.
+- **M3** — **static export** build wired end-to-end against the hard20 `export_results.sh` output; produce a shippable static bundle.
 - **M4** — **Docker** image (server mode) + the dataset `scripts/` run command.
-- **Stretch** — runs side panel (multi-trial), npx distribution, public benchmark-site host.
+- **Stretch** — npx distribution; public benchmark-site host; richer cross-task/model comparison views.
