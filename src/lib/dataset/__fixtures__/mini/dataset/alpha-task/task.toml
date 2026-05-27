@@ -1,0 +1,11 @@
+version = "1.0"
+
+[environment]
+cpus = 1
+allow_internet = false
+
+[task]
+name = "vettoai/alpha-task"
+description = "Alpha Task Title"
+keywords = ["Data Querying", "sql", "duckdb"]
+difficulty = "hard"

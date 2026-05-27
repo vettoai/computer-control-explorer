@@ -1,0 +1,7 @@
+version = "1.0"
+
+[task]
+name = "vettoai/beta-task"
+description = "Beta Task Title"
+keywords = ["Debugging", "rust"]
+difficulty = "medium"
