@@ -6,7 +6,7 @@
 #   docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data computer-control-explorer
 
 # ---- build ----
-FROM node:22-slim AS builder
+FROM node:24-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # ---- run ----
-FROM node:22-slim AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
