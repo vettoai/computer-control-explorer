@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import { getDatasetInfo } from "@/lib/dataset/loader";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,10 +15,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Computer Control Explorer",
-  description: "Browse computer-control tasks: files, trajectories, and results.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const info = await getDatasetInfo();
+  return {
+    title: info
+      ? `${info.name} · Computer Control Dataset Explorer`
+      : "Computer Control Dataset Explorer",
+    description:
+      info?.description ?? "Browse computer-control tasks: files, trajectories, and results.",
+  };
+}
 
 export default function RootLayout({
   children,

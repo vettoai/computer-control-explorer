@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { getTask, listCategories, listTasks } from "./loader";
+import { getDatasetInfo, getTask, listCategories, listTasks } from "./loader";
 
 const FIXTURE = path.join(import.meta.dirname, "__fixtures__/mini");
 
@@ -26,6 +26,19 @@ describe("listTasks", () => {
 
   it("returns [] when the dataset dir has no dataset/ folder", async () => {
     expect(await listTasks(path.join(FIXTURE, "nope"))).toEqual([]);
+  });
+});
+
+describe("getDatasetInfo", () => {
+  it("reads name (org stripped) + description from dataset/dataset.toml", async () => {
+    expect(await getDatasetInfo(FIXTURE)).toEqual({
+      name: "mini-fixture-dataset",
+      description: "A tiny fixture dataset for tests.",
+    });
+  });
+
+  it("returns null when there is no dataset.toml", async () => {
+    expect(await getDatasetInfo(path.join(FIXTURE, "nope"))).toBeNull();
   });
 });
 

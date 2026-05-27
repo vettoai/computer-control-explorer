@@ -1,0 +1,4 @@
+[dataset]
+name = "vettoai/mini-fixture-dataset"
+description = "A tiny fixture dataset for tests."
+keywords = []

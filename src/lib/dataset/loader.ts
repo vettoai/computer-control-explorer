@@ -140,3 +140,29 @@ export async function getTask(
   }
   return { ...metaFromToml(slug, toml), toml, files };
 }
+
+export interface DatasetInfo {
+  name: string; // org prefix stripped, e.g. "computer-control-202605-hard20"
+  description: string | null;
+}
+
+/** Dataset name + description from `<dir>/dataset/dataset.toml`, or null if absent. */
+export async function getDatasetInfo(
+  dir: string | null = datasetDir(),
+): Promise<DatasetInfo | null> {
+  if (!dir) return null;
+  let toml: Record<string, unknown>;
+  try {
+    toml = await readToml(path.join(dir, "dataset", "dataset.toml"));
+  } catch {
+    return null;
+  }
+  const ds = toml.dataset;
+  const section = ds && typeof ds === "object" ? (ds as Record<string, unknown>) : {};
+  const rawName = typeof section.name === "string" ? section.name : null;
+  if (!rawName) return null;
+  return {
+    name: rawName.replace(/^[^/]+\//, ""),
+    description: typeof section.description === "string" ? section.description : null,
+  };
+}
