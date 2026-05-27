@@ -14,6 +14,7 @@ export interface Trial {
   agent: string; // terminus-2 | codex | oracle | …
   model: string | null; // raw config.agent.model_name
   isOracle: boolean;
+  versionLabel: string | null; // human label for taskChecksum, from out/version-labels.json
   reward: number | null; // verifier_result.rewards.reward
   passed: boolean; // reward != null && reward >= 1
   startedAt: string | null;
@@ -35,6 +36,7 @@ export interface ModelStat {
   model: string;
   modelLabel: string;
   checksum: string;
+  versionLabel: string | null;
   trials: number;
   passes: number;
   passRate: number;

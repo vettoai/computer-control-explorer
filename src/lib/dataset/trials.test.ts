@@ -43,6 +43,13 @@ describe("getTaskTrials", () => {
     expect(oracle.agent).toBe("oracle");
     expect(oracle.model).toBeNull();
   });
+
+  it("stamps versionLabel from out/version-labels.json", async () => {
+    const trials = await getTaskTrials("alpha-task", FIXTURE);
+    expect(trials.every((t) => t.versionLabel === "with hints")).toBe(true); // all CHK1
+    const beta = await getTaskTrials("beta-task", FIXTURE);
+    expect(beta[0].versionLabel).toBe("without hints"); // CHK2
+  });
 });
 
 describe("taskTrialStats", () => {
@@ -52,6 +59,7 @@ describe("taskTrialStats", () => {
     expect(stats[0]).toMatchObject({
       modelLabel: "gemini-3.5-flash",
       checksum: "CHK1",
+      versionLabel: "with hints",
       trials: 2,
       passes: 1,
       passRate: 0.5,
