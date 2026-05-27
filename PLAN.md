@@ -113,11 +113,45 @@ as a direct port; the only real engineering is the filesystem loader + the task 
 
 ## 6. Sanitization (customer-facing)
 
-The raw ATIF embeds internal bits: `agent.model = "litellm_proxy/vertex_ai/gemini-3.5-flash"`
-and `metrics.total_cost_usd`. A small normalizer (applied in the loader) must: strip the
-`litellm_proxy/<provider>/` prefix → show `gemini-3.5-flash`; hide our USD cost (keep
-token counts if desired); drop internal job-dir names from any displayed path. Configurable
-so an internal build can show everything.
+The model identity is a **feature, not a secret** — researchers want to know which model
+produced a trajectory. So we **show** the model; we only clean the internal *transport*
+plumbing. A small normalizer (in the loader): strip the `litellm_proxy/<provider>/` prefix
+on `config.agent.model_name` → display `gemini-3.5-flash` / `claude-opus-4-6` / `gpt-5.4`;
+hide our `total_cost_usd` (token counts optional); drop internal job-dir names from
+displayed paths. Configurable so an internal build can show everything (incl. cost).
+
+---
+
+## 6.5 Trials, versions & per-model stats
+
+Researchers want **which model** ran a trajectory and **how models compare** — so we
+surface model identity and per-model pass rates. Both keys are in every trial's
+`result.json` (confirmed): `config.agent.model_name` (the model) and `task_checksum`
+(the immutable-version hash); pass/fail is `verifier_result.rewards.reward`.
+
+**Immutable grouping.** Trials are only comparable within one `task_checksum`. Easing
+(hints edit `instruction.md`) and task bumps change content → a **new checksum**, so
+**with-hints / no-hints / pre-bump / post-bump separate automatically**. This is the same
+discipline curation enforces (COMMON_PITFALLS G2: never aggregate across checksums). The
+loader groups trials by `task_checksum`; within a version it computes per-model pass rate
+via the ported `run-result-utils`.
+
+**UI.** Trajectory picker shows **agent + model** per trial plus a **version selector**
+(checksum-grouped); the task view gets a small **stats table** — model × version → pass%
+(n trials).
+
+**Version labels** (a checksum is opaque): attach a human label in order of preference —
+(a) an `explorer.json` manifest in the dataset mapping checksum → label; (b) auto-derive
+by matching the trial's instruction to `instruction_with_hints.md` / `instruction_no_hints.md`;
+(c) the bucket subfolder name.
+
+**Organization — both supported, no design change:**
+- *Flat* `out/` → auto-group by `task_checksum`; one export shows all versions via the
+  selector (the **dynamic** default — low magic, the checksum does the work).
+- *Bucketed* subfolders (`out/pre-bump/`, `out/with-hints/`, …) → respected as explicit
+  versions, **or** built as separate per-bucket exports if you prefer isolated explorers.
+
+Recommendation: **dynamic / group-by-checksum** as default; separate-export as the trivial fallback.
 
 ---
 
@@ -128,7 +162,9 @@ so an internal build can show everything.
   summary if runs present.
 - **B. Task detail** — file browser (syntax-highlighted) + metadata panel (`task.toml`).
 - **C. Trajectory view** — `TrajectoryViewer` (parsed commands + raw) + results
-  (`run-result-utils`) + solve output. Runs side panel = stretch.
+  (`run-result-utils`) + solve output, with a **version selector** (checksum-grouped) and
+  the **model** shown per trial. Plus a per-task **stats table** (model × version → pass%).
+  Multi-trial runs side panel = stretch.
 
 ---
 
@@ -165,6 +201,9 @@ keep Arena-internal path references out of any public version of this doc.
    unchanged (it should; both are ATIF) and the `entries` render as expected.
 4. **Multiple trials per task** — do we ship k trials per task (then we need trial
    selection / the runs panel) or one representative trial for the demo?
+5. **Version labeling & checksum behavior** — confirm hints/bumps yield distinct
+   `task_checksum`s (expected); pick the label source (manifest vs. auto-derive vs.
+   subfolder); decide whether hard20 ships flavor-bucketed `out/` subfolders or flat.
 
 ---
 
