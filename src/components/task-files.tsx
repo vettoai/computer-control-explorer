@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { CodeBlock } from "@/components/code-block";
 import { FileTree } from "@/components/file-tree";
 import { ancestorDirs, buildFileTree } from "@/lib/dataset/file-tree";
 import type { TaskDetail } from "@/lib/dataset/types";
@@ -59,9 +60,7 @@ export function TaskFiles({ task }: { task: TaskDetail }) {
               <span className="text-xs text-zinc-400">{formatBytes(file.size)}</span>
             </div>
             {file.content !== null ? (
-              <pre className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
-                {file.content}
-              </pre>
+              <CodeBlock content={file.content} filename={file.path} />
             ) : (
               <p className="p-4 text-sm text-zinc-500 dark:text-zinc-400">
                 Binary or oversized file — not shown ({formatBytes(file.size)}).
