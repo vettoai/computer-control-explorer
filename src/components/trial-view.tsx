@@ -86,7 +86,9 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
 
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Field label="Agent" value={trial.agent} />
-        {!trial.isOracle && <Field label="Model" value={trial.model ?? "—"} mono />}
+        {!trial.isOracle && (
+          <Field label="Model" value={modelLabel(trial.model)} mono title={trial.model ?? undefined} />
+        )}
         <Field label="Task version" value={trial.taskChecksum.slice(0, 12)} mono title={trial.taskChecksum} />
         {trial.durationSec != null && <Field label="Duration" value={`${trial.durationSec}s`} />}
         <Field label="Job" value={trial.jobLabel} mono />
