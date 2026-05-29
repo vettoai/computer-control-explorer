@@ -69,7 +69,7 @@ export function CodeBlock({ content, filename }: { content: string; filename: st
   }, [content, lang]);
 
   return (
-    <pre className="hljs max-h-[70vh] overflow-auto bg-transparent p-4 font-mono text-xs leading-relaxed">
+    <pre className="hljs max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words bg-transparent p-4 font-mono text-xs leading-relaxed">
       {html ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{content}</code>}
     </pre>
   );
