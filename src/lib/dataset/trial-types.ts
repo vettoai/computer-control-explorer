@@ -64,3 +64,64 @@ export function modelLabel(model: string | null): string {
   if (!model) return "unknown";
   return model.split("/").pop() ?? model;
 }
+
+export type HintVariant = "with" | "without";
+
+/** Pass stats for one task under a single hint variant. */
+export interface HintPassRate {
+  trials: number;
+  passes: number;
+  passRate: number; // passes / trials
+}
+
+/** Per-task pass rate split by hint variant — what the task-list cards show. A variant is
+ * null when the dataset has no trials of that kind for the task. */
+export interface TaskHintStats {
+  withHints: HintPassRate | null;
+  withoutHints: HintPassRate | null;
+}
+
+/**
+ * Classify a run by its job-folder name as a hint variant, or null when the name carries
+ * no hint marker. Hints live in the folder name by convention (PLAN §6.5), e.g.
+ * `gemini-with-hints` vs `gemini-no-hints`. Case-insensitive; a negation ("no"/"without"/
+ * "hint-free") wins over the bare "hint" so `no-hints` reads as `without`.
+ */
+export function hintVariant(jobLabel: string): HintVariant | null {
+  const s = jobLabel.toLowerCase();
+  if (!s.includes("hint")) return null;
+  const negated =
+    /no[-_ ]?hint/.test(s) || /without[-_ ]?hint/.test(s) || /hint[-_ ]?free/.test(s);
+  return negated ? "without" : "with";
+}
+
+function hintPassRate(trials: Trial[]): HintPassRate | null {
+  if (trials.length === 0) return null;
+  const passes = trials.filter((t) => t.passed).length;
+  return { trials: trials.length, passes, passRate: passes / trials.length };
+}
+
+/**
+ * Per-task pass rate split by hint variant, keyed by slug — the summary the task-list cards
+ * show so a task can be picked by how solvable it is. The variant comes from the job-folder
+ * name (via {@link hintVariant}); runs whose folder carries no hint marker, and oracle
+ * trials, are skipped. Aggregated across models/runs of the same variant — a coarse
+ * card-level number; the task page keeps the per-model breakdown. A task absent from the map
+ * (or with both variants null) simply has no hint-labelled trials.
+ */
+export function taskHintStats(trials: Trial[]): Record<string, TaskHintStats> {
+  const groups = new Map<string, { with: Trial[]; without: Trial[] }>();
+  for (const t of trials) {
+    if (t.isOracle) continue;
+    const variant = hintVariant(t.jobLabel);
+    if (!variant) continue;
+    const g = groups.get(t.slug) ?? { with: [], without: [] };
+    (variant === "with" ? g.with : g.without).push(t);
+    groups.set(t.slug, g);
+  }
+  const out: Record<string, TaskHintStats> = {};
+  for (const [slug, g] of groups) {
+    out[slug] = { withHints: hintPassRate(g.with), withoutHints: hintPassRate(g.without) };
+  }
+  return out;
+}
