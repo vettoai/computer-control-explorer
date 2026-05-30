@@ -15,15 +15,25 @@ function pct(rate: number): string {
 // even with hints) gets a yellow nudge; partly-solvable tasks (≤60%) a muted green; mostly-
 // solved tasks fade to whitish since there's little left to dig into. The hue is blended
 // ~65% into the neutral text color (color-mix) so it shows clearly without being a neon label.
-function rateColor(rate: number): string {
+// `greenMax` is the variant's "still interesting" ceiling — wider for hints than no-hints,
+// since a solved-with-hints task is more notable than a solved-without one.
+function rateColor(rate: number, greenMax: number): string {
   if (rate === 0)
     return "text-[color-mix(in_oklab,var(--color-yellow-600)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-yellow-400)_65%,var(--color-zinc-300))]";
-  if (rate <= 0.8)
+  if (rate <= greenMax)
     return "text-[color-mix(in_oklab,var(--color-green-700)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-green-400)_65%,var(--color-zinc-300))]";
   return "text-zinc-400 dark:text-zinc-500";
 }
 
-function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
+function HintRate({
+  label,
+  rate,
+  greenMax,
+}: {
+  label: string;
+  rate: HintPassRate;
+  greenMax: number;
+}) {
   return (
     <span
       title={`${rate.passes} of ${rate.trials} ${label} trials passed`}
@@ -32,7 +42,7 @@ function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
       <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
         {label}
       </span>
-      <span className={cn("text-xs font-semibold tabular-nums", rateColor(rate.passRate))}>
+      <span className={cn("text-xs font-semibold tabular-nums", rateColor(rate.passRate, greenMax))}>
         {pct(rate.passRate)}
       </span>
     </span>
@@ -45,8 +55,10 @@ function HintRates({ stats }: { stats: TaskHintStats | undefined }) {
   if (!stats || (!stats.withHints && !stats.withoutHints)) return null;
   return (
     <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-      {stats.withHints && <HintRate label="hints" rate={stats.withHints} />}
-      {stats.withoutHints && <HintRate label="no hints" rate={stats.withoutHints} />}
+      {stats.withHints && <HintRate label="hints" rate={stats.withHints} greenMax={0.8} />}
+      {stats.withoutHints && (
+        <HintRate label="no hints" rate={stats.withoutHints} greenMax={0.6} />
+      )}
     </div>
   );
 }
