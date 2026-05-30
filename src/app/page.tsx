@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { GlobalStats } from "@/components/global-stats";
 import { TaskList } from "@/components/task-list";
 import { getDatasetInfo, listTasks } from "@/lib/dataset/loader";
+import { taskHintStats } from "@/lib/dataset/trial-types";
 import { globalRunStats, listTrials } from "@/lib/dataset/trials";
 
 export default async function Home() {
@@ -20,6 +21,7 @@ export default async function Home() {
     listTrials(),
   ]);
   const runStats = globalRunStats(trials);
+  const hintStats = taskHintStats(trials);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -68,7 +70,7 @@ export default async function Home() {
       ) : (
         <>
           <GlobalStats stats={runStats} />
-          <TaskList tasks={tasks} />
+          <TaskList tasks={tasks} hintStats={hintStats} />
         </>
       )}
     </div>

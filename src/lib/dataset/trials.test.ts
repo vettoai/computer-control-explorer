@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { hintVariant, taskHintStats } from "./trial-types";
 import {
   getTaskTrials,
   getTrial,
@@ -146,5 +147,53 @@ describe("globalRunStats", () => {
 
     // oracle is included and sorted to the bottom (reference ceiling)
     expect(stats[stats.length - 1]).toMatchObject({ jobLabel: "oracle", isOracle: true, tasks: 1 });
+  });
+});
+
+describe("hintVariant", () => {
+  it("reads the variant from the job-folder name, with negation winning over bare 'hint'", () => {
+    expect(hintVariant("gemini-with-hints")).toBe("with");
+    expect(hintVariant("gemini-hints")).toBe("with");
+    expect(hintVariant("Hinted-Run")).toBe("with");
+    expect(hintVariant("gemini-no-hints")).toBe("without");
+    expect(hintVariant("gemini-nohints")).toBe("without");
+    expect(hintVariant("no_hint_baseline")).toBe("without");
+    expect(hintVariant("hint-free")).toBe("without");
+    expect(hintVariant("testjob")).toBeNull();
+    expect(hintVariant("oracle")).toBeNull();
+  });
+});
+
+describe("taskHintStats", () => {
+  it("splits per-task pass rate by hint variant, ignoring unlabelled runs and oracle", () => {
+    const trials: Trial[] = [
+      mkTrial({ slug: "alpha", jobLabel: "gemini-with-hints", reward: 1, passed: true }),
+      mkTrial({ slug: "alpha", jobLabel: "gemini-with-hints", reward: 1, passed: true }),
+      mkTrial({ slug: "alpha", jobLabel: "gemini-with-hints", reward: 0, passed: false }),
+      mkTrial({ slug: "alpha", jobLabel: "gemini-no-hints", reward: 0, passed: false }),
+      mkTrial({ slug: "alpha", jobLabel: "gemini-no-hints", reward: 0, passed: false }),
+      mkTrial({ slug: "alpha", jobLabel: "testjob", reward: 1, passed: true }), // no marker → ignored
+      mkTrial({
+        slug: "alpha",
+        jobLabel: "with-hints",
+        reward: 1,
+        passed: true,
+        isOracle: true,
+        agent: "oracle",
+      }), // oracle → excluded
+      mkTrial({ slug: "beta", jobLabel: "no-hints", reward: 1, passed: true }),
+    ];
+    const stats = taskHintStats(trials);
+
+    expect(stats.alpha.withHints).toMatchObject({ trials: 3, passes: 2 });
+    expect(stats.alpha.withHints!.passRate).toBeCloseTo(2 / 3);
+    expect(stats.alpha.withoutHints).toEqual({ trials: 2, passes: 0, passRate: 0 });
+    expect(stats.beta.withHints).toBeNull();
+    expect(stats.beta.withoutHints).toEqual({ trials: 1, passes: 1, passRate: 1 });
+  });
+
+  it("omits tasks that have no hint-labelled trials", () => {
+    const stats = taskHintStats([mkTrial({ slug: "x", jobLabel: "testjob" })]);
+    expect(stats.x).toBeUndefined();
   });
 });
