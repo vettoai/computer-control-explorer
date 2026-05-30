@@ -11,13 +11,6 @@ function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-// Scanning aid for the cards: green = mostly solved, amber = mixed, red = mostly unsolved.
-function rateColor(rate: number): string {
-  if (rate >= 0.7) return "text-green-600 dark:text-green-400";
-  if (rate >= 0.3) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
-}
-
 function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
   return (
     <span
@@ -27,7 +20,7 @@ function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
       <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
         {label}
       </span>
-      <span className={cn("text-xs font-semibold tabular-nums", rateColor(rate.passRate))}>
+      <span className="text-xs font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
         {pct(rate.passRate)}
       </span>
     </span>
