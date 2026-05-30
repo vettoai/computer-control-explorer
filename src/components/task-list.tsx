@@ -14,12 +14,12 @@ function pct(rate: number): string {
 // A discreet tint that flags how interesting the rate is, not good/bad: 0% (never solved,
 // even with hints) gets a yellow nudge; partly-solvable tasks (≤60%) a muted green; mostly-
 // solved tasks fade to whitish since there's little left to dig into. The hue is blended
-// ~40% into the neutral text color (color-mix) so it reads as a tint, never a bright label.
+// ~65% into the neutral text color (color-mix) so it shows clearly without being a neon label.
 function rateColor(rate: number): string {
   if (rate === 0)
-    return "text-[color-mix(in_oklab,var(--color-yellow-700)_45%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-yellow-400)_40%,var(--color-zinc-300))]";
-  if (rate <= 0.6)
-    return "text-[color-mix(in_oklab,var(--color-green-800)_45%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-green-400)_40%,var(--color-zinc-300))]";
+    return "text-[color-mix(in_oklab,var(--color-yellow-600)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-yellow-400)_65%,var(--color-zinc-300))]";
+  if (rate <= 0.8)
+    return "text-[color-mix(in_oklab,var(--color-green-700)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-green-400)_65%,var(--color-zinc-300))]";
   return "text-zinc-400 dark:text-zinc-500";
 }
 
