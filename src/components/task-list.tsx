@@ -11,6 +11,15 @@ function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
+// A discreet tint that flags how interesting the rate is, not good/bad: 0% (never solved,
+// even with hints) gets a yellow nudge; partly-solvable tasks (≤60%) a muted green; mostly-
+// solved tasks fade to whitish since there's little left to dig into.
+function rateColor(rate: number): string {
+  if (rate === 0) return "text-yellow-700 dark:text-yellow-500/90";
+  if (rate <= 0.6) return "text-green-800 dark:text-green-500/90";
+  return "text-zinc-400 dark:text-zinc-400";
+}
+
 function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
   return (
     <span
@@ -20,7 +29,7 @@ function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
       <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
         {label}
       </span>
-      <span className="text-xs font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
+      <span className={cn("text-xs font-semibold tabular-nums", rateColor(rate.passRate))}>
         {pct(rate.passRate)}
       </span>
     </span>
