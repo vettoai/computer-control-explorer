@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 
-import { type ModelStat, modelLabel, type Trial } from "@/lib/dataset/trial-types";
+import {
+  type ModelStat,
+  modelLabel,
+  type TrialWithTurns,
+} from "@/lib/dataset/trial-types";
 
 function shortChecksum(c: string): string {
   return c.length > 10 ? c.slice(0, 10) : c;
+}
+
+// "12 / 34" (avg rounded / max), or "—" when no trial in the group had a trajectory.
+function turnsLabel(avg: number | null, max: number | null): string {
+  return avg === null || max === null ? "—" : `${Math.round(avg)} / ${max}`;
 }
 
 function pct(rate: number): string {
@@ -29,6 +38,9 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
             <th className="px-3 py-2 text-right font-medium">Trials</th>
             <th className="px-3 py-2 text-right font-medium">Pass rate</th>
             <th className="px-3 py-2 text-right font-medium">Mean reward</th>
+            <th className="px-3 py-2 text-right font-medium" title="Mean / max agent turns">
+              Turns avg/max
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -49,6 +61,9 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
               <td className="px-3 py-2 text-right tabular-nums text-zinc-500">
                 {s.meanReward === null ? "—" : s.meanReward.toFixed(2)}
               </td>
+              <td className="px-3 py-2 text-right tabular-nums text-zinc-500">
+                {turnsLabel(s.avgTurns, s.maxTurns)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -57,7 +72,7 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
   );
 }
 
-function TrialRow({ slug, trial }: { slug: string; trial: Trial }) {
+function TrialRow({ slug, trial }: { slug: string; trial: TrialWithTurns }) {
   const started = trial.startedAt ? new Date(trial.startedAt).toLocaleString() : "—";
   // In job-grouped sections the run is the heading, so each row shows the model
   // (oracle rows have no model — show the run folder instead).
@@ -72,6 +87,14 @@ function TrialRow({ slug, trial }: { slug: string; trial: Trial }) {
         {trial.reward === null ? "no result" : `reward ${trial.reward}`}
       </span>
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
+      {trial.turns != null && (
+        <span
+          className="w-16 shrink-0 text-right text-xs tabular-nums text-zinc-400"
+          title={`${trial.turns} agent turns`}
+        >
+          {trial.turns} turns
+        </span>
+      )}
       <span className="shrink-0 text-xs text-zinc-400">{started}</span>
       {trial.durationSec != null && (
         <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-400">
@@ -88,7 +111,7 @@ export function TaskTrials({
   stats,
 }: {
   slug: string;
-  trials: Trial[];
+  trials: TrialWithTurns[];
   stats: ModelStat[];
 }) {
   if (trials.length === 0) {
@@ -103,7 +126,7 @@ export function TaskTrials({
   const agentTrials = trials.filter((t) => !t.isOracle);
 
   // Group agent trials by job folder (the run); sections ordered by earliest start.
-  const byJob = new Map<string, Trial[]>();
+  const byJob = new Map<string, TrialWithTurns[]>();
   for (const t of agentTrials) {
     (byJob.get(t.jobLabel) ?? byJob.set(t.jobLabel, []).get(t.jobLabel)!).push(t);
   }

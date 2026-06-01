@@ -259,3 +259,18 @@ export function parseAtifTrajectory(content: string): ParsedAtifResult {
     metrics: data.final_metrics ?? undefined,
   };
 }
+
+/**
+ * Count agent turns in a raw ATIF trajectory — one per agent-source step, i.e. the units
+ * {@link parseAtifTrajectory} renders as thinking/command blocks. Returns null when the
+ * content can't be parsed or carries no `steps` array. Pure; safe on client and server.
+ */
+export function countAgentTurns(content: string): number | null {
+  try {
+    const data: AtifTrajectory = JSON.parse(content);
+    if (!Array.isArray(data.steps)) return null;
+    return data.steps.filter((s) => s?.source === "agent").length;
+  } catch {
+    return null;
+  }
+}

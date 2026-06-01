@@ -90,6 +90,7 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
           <Field label="Model" value={modelLabel(trial.model)} mono title={trial.model ?? undefined} />
         )}
         <Field label="Task version" value={trial.taskChecksum.slice(0, 12)} mono title={trial.taskChecksum} />
+        {trial.turns != null && <Field label="Turns" value={String(trial.turns)} />}
         {trial.durationSec != null && <Field label="Duration" value={`${trial.durationSec}s`} />}
         <Field label="Job" value={trial.jobLabel} mono />
         {trial.startedAt && (

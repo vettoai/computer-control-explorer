@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAtifTrajectory, parseStructuredAgentMessage, stripNoisyLogLines } from "./atif";
+import {
+  countAgentTurns,
+  parseAtifTrajectory,
+  parseStructuredAgentMessage,
+  stripNoisyLogLines,
+} from "./atif";
 
 const TRAJECTORY = JSON.stringify({
   schema_version: "ATIF-v1.6",
@@ -99,6 +104,17 @@ describe("parseAtifTrajectory with a structured JSON message", () => {
     const thinking = entries.find((e) => e.type === "thinking")!;
     expect(thinking.summary).toBe("I will read solution.py first.");
     expect(thinking.summary).not.toContain("{");
+  });
+});
+
+describe("countAgentTurns", () => {
+  it("counts only agent-source steps", () => {
+    expect(countAgentTurns(TRAJECTORY)).toBe(2); // 2 agent steps + 1 environment step ignored
+  });
+
+  it("returns null for unparseable content or a missing steps array", () => {
+    expect(countAgentTurns("not json")).toBeNull();
+    expect(countAgentTurns(JSON.stringify({ schema_version: "x" }))).toBeNull();
   });
 });
 

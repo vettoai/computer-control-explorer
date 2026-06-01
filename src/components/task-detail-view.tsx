@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { TaskFiles } from "@/components/task-files";
 import { TaskTrials } from "@/components/task-trials";
-import type { ModelStat, Trial } from "@/lib/dataset/trial-types";
+import type { ModelStat, TrialWithTurns } from "@/lib/dataset/trial-types";
 import type { TaskDetail } from "@/lib/dataset/types";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,7 @@ export function TaskDetailView({
   stats,
 }: {
   task: TaskDetail;
-  trials: Trial[];
+  trials: TrialWithTurns[];
   stats: ModelStat[];
 }) {
   const [tab, setTab] = useState<Tab>("files");
