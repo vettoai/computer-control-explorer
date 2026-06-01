@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAtifTrajectory, stripNoisyLogLines } from "./atif";
+import { parseAtifTrajectory, parseStructuredAgentMessage, stripNoisyLogLines } from "./atif";
 
 const TRAJECTORY = JSON.stringify({
   schema_version: "ATIF-v1.6",
@@ -44,6 +44,61 @@ describe("parseAtifTrajectory", () => {
     expect(thinking[0].summary).toBe("inspect the schema."); // "Analysis: " stripped
     expect(commands[0]).toMatchObject({ summary: "ls -la", status: "completed" });
     expect(commands[1]).toMatchObject({ summary: "false", status: "failed" });
+  });
+});
+
+describe("parseStructuredAgentMessage", () => {
+  it("returns null for plain prose (not the structured format)", () => {
+    expect(parseStructuredAgentMessage("Analysis: just inspect the repo.")).toBeNull();
+    expect(parseStructuredAgentMessage("{ not analysis }")).toBeNull();
+  });
+
+  it("extracts analysis + plan from a valid JSON message", () => {
+    const msg = JSON.stringify({
+      analysis: "The schema collides.",
+      plan: "rename the table",
+      commands: [{ keystrokes: "ls\n" }],
+      task_complete: false,
+    });
+    expect(parseStructuredAgentMessage(msg)).toBe("The schema collides.\n\nPlan: rename the table");
+  });
+
+  it("tolerantly extracts from malformed JSON (literal newlines + LaTeX escapes)", () => {
+    // Invalid JSON: a literal newline inside the string and `\alpha`/`\gamma` (bad escapes) —
+    // exactly the shape the model emits when its escaping is off.
+    const malformed =
+      '{\n  "analysis": "Focal loss uses \\alpha and \\gamma.\nSecond line here.",\n' +
+      '  "plan": "inspect \\beta then ls",\n' +
+      '  "commands": [ { "keystrokes": "ls -la\\n" } ],\n' +
+      '  "task_complete": false\n}';
+    // sanity: it really is unparseable
+    expect(() => JSON.parse(malformed)).toThrow();
+
+    const out = parseStructuredAgentMessage(malformed)!;
+    expect(out).not.toBeNull();
+    expect(out).not.toContain('"analysis"'); // JSON scaffolding gone
+    expect(out).toContain("Focal loss uses \\alpha and \\gamma."); // LaTeX preserved
+    expect(out).toContain("\nSecond line here."); // literal newline kept as a real break
+    expect(out).toContain("Plan: inspect \\beta then ls");
+  });
+});
+
+describe("parseAtifTrajectory with a structured JSON message", () => {
+  it("renders the analysis text, not the raw JSON blob", () => {
+    const traj = JSON.stringify({
+      schema_version: "ATIF-v1.6",
+      steps: [
+        {
+          source: "agent",
+          // a JSON-object message with no tool_calls (the harness failed to parse it)
+          message: '{"analysis": "I will read solution.py first.", "task_complete": false}',
+        },
+      ],
+    });
+    const { entries } = parseAtifTrajectory(traj);
+    const thinking = entries.find((e) => e.type === "thinking")!;
+    expect(thinking.summary).toBe("I will read solution.py first.");
+    expect(thinking.summary).not.toContain("{");
   });
 });
 
