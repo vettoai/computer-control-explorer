@@ -56,7 +56,7 @@ function ThinkingEntry({ entry, relTime }: { entry: AgentLogEntry; relTime: stri
       <button onClick={() => setExpanded(!expanded)} className="flex w-full items-start gap-2 text-left">
         <Brain className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-zinc-200">
+          <p className="whitespace-pre-wrap break-words text-xs text-zinc-200">
             {expanded ? entry.summary : firstLine}
             {!expanded && hasMore ? "..." : ""}
           </p>

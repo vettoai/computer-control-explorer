@@ -142,16 +142,91 @@ function cleanMessage(msg: string): string {
   return msg.replace(/^Analysis:\s*/i, "");
 }
 
+/** Decode JSON string escapes, leaving *invalid* escapes intact (e.g. LaTeX `\alpha`,
+ * which is exactly what breaks JSON.parse on these messages — we want to keep it readable,
+ * not drop the backslash). */
+function decodeJsonEscapes(s: string): string {
+  return s.replace(/\\(u[0-9a-fA-F]{4}|[\s\S])(?=([\s\S]?))/g, (whole, esc: string, next: string) => {
+    // A valid control escape followed by a lowercase letter is almost always a LaTeX/command
+    // token the model wrote (\nu, \beta, \theta, \frac) rather than a real \n/\t — keep it
+    // verbatim. Standalone \n\n, \n + capital/space, etc. still decode to the real character.
+    const latexish = /[a-z]/.test(next ?? "");
+    switch (esc[0]) {
+      case '"': return '"';
+      case "\\": return "\\";
+      case "/": return "/";
+      case "u": return String.fromCharCode(parseInt(esc.slice(1), 16));
+      case "b": return latexish ? whole : "\b";
+      case "f": return latexish ? whole : "\f";
+      case "n": return latexish ? whole : "\n";
+      case "r": return latexish ? whole : "\r";
+      case "t": return latexish ? whole : "\t";
+      default: return whole; // invalid escape (\alpha, \gamma, …) — keep verbatim
+    }
+  });
+}
+
+/** Best-effort read of one string field from *malformed* JSON: find `"key": "`, take up to
+ * the next top-level key (`", "<nextKey>":`) or the object's end, then decode escapes. The
+ * model wrote the field boundaries correctly; only the inner escaping is broken, so keying
+ * off the next field is reliable in practice. */
+function grabJsonStringField(raw: string, key: string, nextKeys: string[]): string | undefined {
+  const open = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
+  if (!open) return undefined;
+  const start = open.index + open[0].length;
+  const rest = raw.slice(start);
+  const boundary = new RegExp(`"\\s*,\\s*"(?:${nextKeys.join("|")})"\\s*:|"\\s*\\}\\s*$`).exec(rest);
+  return decodeJsonEscapes(boundary ? rest.slice(0, boundary.index) : rest);
+}
+
+function joinAnalysisPlan(analysis?: string, plan?: string): string {
+  const parts: string[] = [];
+  if (analysis?.trim()) parts.push(analysis.trim());
+  if (plan?.trim()) parts.push(`Plan: ${plan.trim()}`);
+  return parts.join("\n\n");
+}
+
+/**
+ * Some agents emit a turn as a JSON-object string in `message`, e.g.
+ *   {"analysis": "…", "plan": "…", "commands": [...], "task_complete": false}
+ * When the model's escaping is off (literal newlines, LaTeX `\alpha`) it fails to parse and
+ * the raw blob would otherwise render verbatim. Pull out the human-readable analysis (and
+ * plan) — strictly if the JSON is valid, tolerantly otherwise. Returns null when `message`
+ * isn't this structured format, so callers can fall back to plain text.
+ */
+export function parseStructuredAgentMessage(message: string): string | null {
+  const trimmed = message.trimStart();
+  if (!trimmed.startsWith("{") || !/"analysis"\s*:/.test(trimmed)) return null;
+
+  try {
+    const obj = JSON.parse(trimmed);
+    if (obj && typeof obj === "object") {
+      const text = joinAnalysisPlan(
+        typeof obj.analysis === "string" ? obj.analysis : undefined,
+        typeof obj.plan === "string" ? obj.plan : undefined,
+      );
+      if (text) return text;
+    }
+  } catch {
+    // Malformed (the common case) — fall through to tolerant field extraction.
+  }
+
+  const analysis = grabJsonStringField(trimmed, "analysis", ["plan", "commands", "task_complete"]);
+  const plan = grabJsonStringField(trimmed, "plan", ["commands", "task_complete"]);
+  return joinAnalysisPlan(analysis, plan) || null;
+}
+
 function parseAgentStep(step: AtifStep, index: number): AgentLogEntry[] {
   const id = step.step_id ?? `atif-${index}`;
   const toolCalls = parseToolCalls(step.tool_calls);
   const entries: AgentLogEntry[] = [];
 
   const msg = step.message;
-  if (msg && !msg.startsWith("Executed ") && toolCalls.length > 0) {
-    entries.push({ id: `${id}-think`, type: "thinking", summary: cleanMessage(msg) });
-  } else if (msg && !msg.startsWith("Executed ") && toolCalls.length === 0) {
-    entries.push({ id, type: "thinking", summary: cleanMessage(msg) });
+  if (msg && !msg.startsWith("Executed ")) {
+    // A structured JSON message (often the model's un-parseable raw output) renders as its
+    // readable analysis/plan; a plain prose message just loses its "Analysis: " prefix.
+    const summary = parseStructuredAgentMessage(msg) ?? cleanMessage(msg);
+    entries.push({ id: toolCalls.length > 0 ? `${id}-think` : id, type: "thinking", summary });
   }
 
   if (toolCalls.length > 0) {
