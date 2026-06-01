@@ -23,9 +23,17 @@ export interface Trial {
   relPath: string; // trial dir, relative to the bundle root
 }
 
+/** A trial with its agent-turn count attached. The count needs the trajectory, which
+ * listTrials does not read, so it's only populated on the per-task path (getTaskTrialsWithTurns)
+ * where the extra I/O is bounded to one task's trials. null = no parseable trajectory. */
+export interface TrialWithTurns extends Trial {
+  turns: number | null;
+}
+
 export interface TrialDetail extends Trial {
   trajectory: ParsedAtifResult | null;
   rawTrajectory: string | null;
+  turns: number | null; // agent turns (countAgentTurns of rawTrajectory)
   testOutput: string | null;
   solveOutput: string | null; // oracle solve stdout (agent/oracle.txt); null for agent trials
   error: string | null;
@@ -41,6 +49,8 @@ export interface ModelStat {
   passes: number;
   passRate: number;
   meanReward: number | null;
+  avgTurns: number | null; // mean agent turns across trials that had a trajectory; null if none
+  maxTurns: number | null; // max agent turns; null if no trial had a trajectory
 }
 
 /** Whole-dataset pass statistics for one run, aggregated across all tasks. Grouped by

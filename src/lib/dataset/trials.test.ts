@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { hintVariant, taskHintStats } from "./trial-types";
 import {
   getTaskTrials,
+  getTaskTrialsWithTurns,
   getTrial,
   globalRunStats,
   listTrials,
@@ -62,6 +63,27 @@ describe("taskTrialStats", () => {
       meanReward: 0.5,
     });
   });
+
+  it("aggregates avg/max agent turns from the trials' trajectories", async () => {
+    const stats = taskTrialStats(await getTaskTrialsWithTurns("alpha-task", FIXTURE));
+    // non-oracle alpha trials have 2 (pass) and 1 (fail) agent turns
+    expect(stats[0]).toMatchObject({ avgTurns: 1.5, maxTurns: 2 });
+  });
+
+  it("reports null avg/max turns when no trajectory was read (plain trials)", async () => {
+    const stats = taskTrialStats(await getTaskTrials("alpha-task", FIXTURE));
+    expect(stats[0]).toMatchObject({ avgTurns: null, maxTurns: null });
+  });
+});
+
+describe("getTaskTrialsWithTurns", () => {
+  it("attaches the agent-turn count to each trial", async () => {
+    const trials = await getTaskTrialsWithTurns("alpha-task", FIXTURE);
+    const pass = trials.find((t) => t.reward === 1 && !t.isOracle)!;
+    const fail = trials.find((t) => t.reward === 0)!;
+    expect(pass.turns).toBe(2);
+    expect(fail.turns).toBe(1);
+  });
 });
 
 describe("getTrial", () => {
@@ -73,6 +95,7 @@ describe("getTrial", () => {
     expect(detail.trajectory!.entries.length).toBeGreaterThan(0);
     expect(detail.trajectory!.entries.some((e) => e.summary.includes("duckdb"))).toBe(true);
     expect(detail.rawTrajectory).toContain("ATIF-v1.6");
+    expect(detail.turns).toBe(2); // two agent steps in the fixture trajectory
   });
 
   it("loads the oracle solve output (agent/oracle.txt)", async () => {
