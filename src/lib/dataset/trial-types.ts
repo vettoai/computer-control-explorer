@@ -6,6 +6,19 @@
 
 import type { ParsedAtifResult } from "@/lib/trajectory/atif";
 
+/**
+ * An infra/agent error the harness recorded for a trial, lifted verbatim from
+ * `result.json` → `exception_info`. This is the harness's own signal — e.g.
+ * `AgentTimeoutError`, `NonZeroAgentExitCodeError` (agent wrecked its environment),
+ * `RuntimeError`, `PermissionError` — NOT something we infer. It is orthogonal to the
+ * reward verdict: a trial can pass or fail AND have errored (a run can time out yet still
+ * verify), so it's surfaced alongside the reward, not in place of it (see {@link trialOutcome}).
+ */
+export interface TrialError {
+  type: string; // exception_type, e.g. "AgentTimeoutError"
+  message: string; // exception_message; may be "" (some types carry only a type)
+}
+
 export interface Trial {
   id: string; // stable short hash of relPath — URL-safe, unique per trial dir
   slug: string; // dataset task slug (from task_id.path)
@@ -16,6 +29,7 @@ export interface Trial {
   isOracle: boolean;
   reward: number | null; // verifier_result.rewards.reward
   passed: boolean; // reward != null && reward >= 1
+  error: TrialError | null; // result.json exception_info, when the harness recorded one
   startedAt: string | null;
   finishedAt: string | null;
   durationSec: number | null;
@@ -36,7 +50,19 @@ export interface TrialDetail extends Trial {
   turns: number | null; // agent turns (countAgentTurns of rawTrajectory)
   testOutput: string | null;
   solveOutput: string | null; // oracle solve stdout (agent/oracle.txt); null for agent trials
-  error: string | null;
+  // Full crash text (exception type + message + traceback) for a run that produced no
+  // trajectory — the structured summary lives in the inherited `error`.
+  errorDetail: string | null;
+}
+
+/** The reward verdict for a trial: passed (full reward), failed (a reward below it), or none
+ * (no reward at all). A recorded harness {@link TrialError} is orthogonal and does NOT change
+ * this — surface `Trial.error` alongside the verdict, not in place of it. */
+export type TrialOutcome = "passed" | "failed" | "none";
+
+export function trialOutcome(t: Pick<Trial, "passed" | "reward">): TrialOutcome {
+  if (t.passed) return "passed";
+  return t.reward === null ? "none" : "failed";
 }
 
 /** Per (model × task version) pass statistics for one task. Oracle excluded. */
@@ -51,6 +77,7 @@ export interface ModelStat {
   meanReward: number | null;
   avgTurns: number | null; // mean agent turns across trials that had a trajectory; null if none
   maxTurns: number | null; // max agent turns; null if no trial had a trajectory
+  errors: number; // trials with a recorded harness error (orthogonal to pass/fail — a passed trial may also have errored)
 }
 
 /** Whole-dataset pass statistics for one run, aggregated across all tasks. Grouped by

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   type ModelStat,
   modelLabel,
+  trialOutcome,
   type TrialWithTurns,
 } from "@/lib/dataset/trial-types";
 
@@ -21,9 +22,31 @@ function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-function PassDot({ passed, reward }: { passed: boolean; reward: number | null }) {
-  const color = passed ? "bg-emerald-500" : reward === null ? "bg-zinc-400" : "bg-red-500";
-  return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />;
+const OUTCOME_DOT = {
+  passed: "bg-emerald-500",
+  failed: "bg-red-500",
+  none: "bg-zinc-400",
+} as const;
+
+function OutcomeDot({ trial }: { trial: TrialWithTurns }) {
+  return (
+    <span
+      className={`inline-block h-2 w-2 rounded-full ${OUTCOME_DOT[trialOutcome(trial)]}`}
+    />
+  );
+}
+
+/** Additional amber chip flagging a recorded harness error — shown alongside the reward,
+ * never in place of it. Full type + message on hover. */
+function ErrorChip({ error }: { error: NonNullable<TrialWithTurns["error"]> }) {
+  return (
+    <span
+      className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+      title={error.message ? `${error.type}: ${error.message}` : error.type}
+    >
+      {error.type}
+    </span>
+  );
 }
 
 function StatsTable({ stats }: { stats: ModelStat[] }) {
@@ -37,6 +60,12 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
             <th className="px-3 py-2 font-medium">Version</th>
             <th className="px-3 py-2 text-right font-medium">Trials</th>
             <th className="px-3 py-2 text-right font-medium">Pass rate</th>
+            <th
+              className="px-3 py-2 text-right font-medium"
+              title="Trials that errored (harness/agent exception — e.g. timeout, crash)"
+            >
+              Errors
+            </th>
             <th className="px-3 py-2 text-right font-medium">Mean reward</th>
             <th className="px-3 py-2 text-right font-medium" title="Mean / max agent turns">
               Turns avg/max
@@ -57,6 +86,13 @@ function StatsTable({ stats }: { stats: ModelStat[] }) {
                 <span className="text-xs text-zinc-400">
                   ({s.passes}/{s.trials})
                 </span>
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {s.errors > 0 ? (
+                  <span className="text-amber-600 dark:text-amber-400">{s.errors}</span>
+                ) : (
+                  <span className="text-zinc-300 dark:text-zinc-600">0</span>
+                )}
               </td>
               <td className="px-3 py-2 text-right tabular-nums text-zinc-500">
                 {s.meanReward === null ? "—" : s.meanReward.toFixed(2)}
@@ -82,11 +118,12 @@ function TrialRow({ slug, trial }: { slug: string; trial: TrialWithTurns }) {
       href={`/task/${slug}/t/${trial.id}`}
       className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-2 text-sm transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
     >
-      <PassDot passed={trial.passed} reward={trial.reward} />
+      <OutcomeDot trial={trial} />
       <span className="w-20 shrink-0 font-mono text-xs">
         {trial.reward === null ? "no result" : `reward ${trial.reward}`}
       </span>
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
+      {trial.error && <ErrorChip error={trial.error} />}
       {trial.turns != null && (
         <span
           className="w-16 shrink-0 text-right text-xs tabular-nums text-zinc-400"

@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hintVariant, taskHintStats } from "./trial-types";
+import { hintVariant, taskHintStats, trialOutcome } from "./trial-types";
 import {
   getTaskTrials,
   getTaskTrialsWithTurns,
@@ -19,9 +19,12 @@ const FIXTURE = path.join(import.meta.dirname, "__fixtures__/mini");
 describe("listTrials", () => {
   it("finds every trial across nested jobs and skips aggregate result.json", async () => {
     const trials = await listTrials(FIXTURE);
-    // 3 alpha (pass, fail, oracle) + 1 beta; the model-run aggregate is not a trial.
-    expect(trials).toHaveLength(4);
-    expect(new Set(trials.map((t) => t.slug))).toEqual(new Set(["alpha-task", "beta-task"]));
+    // 3 alpha (pass, fail, oracle) + 1 beta + 2 gamma (errored: one failed, one passed);
+    // the model-run aggregate isn't a trial.
+    expect(trials).toHaveLength(6);
+    expect(new Set(trials.map((t) => t.slug))).toEqual(
+      new Set(["alpha-task", "beta-task", "gamma-task"]),
+    );
   });
 
   it("returns [] when there is no out/jobs", async () => {
@@ -109,6 +112,55 @@ describe("getTrial", () => {
   });
 });
 
+describe("trial errors (exception_info)", () => {
+  it("lifts a recorded harness error into Trial.error without changing the verdict", async () => {
+    const gamma = (await getTaskTrials("gamma-task", FIXTURE)).find((t) => t.reward === 0)!;
+    expect(gamma.error).toEqual({
+      type: "AgentTimeoutError",
+      message: "Agent execution timed out after 900.0 seconds",
+    });
+    expect(trialOutcome(gamma)).toBe("failed"); // error is additional, not the verdict
+  });
+
+  it("keeps an errored-but-passed trial a pass (a run can time out yet still verify)", async () => {
+    const gamma = (await getTaskTrials("gamma-task", FIXTURE)).find((t) => t.reward === 1)!;
+    expect(gamma.error?.type).toBe("AgentTimeoutError");
+    expect(gamma.passed).toBe(true);
+    expect(trialOutcome(gamma)).toBe("passed");
+  });
+
+  it("leaves Trial.error null on a clean run", async () => {
+    const fail = (await getTaskTrials("alpha-task", FIXTURE)).find((t) => t.reward === 0)!;
+    expect(fail.error).toBeNull();
+    expect(trialOutcome(fail)).toBe("failed");
+  });
+
+  it("exposes the full crash text (type + message + traceback) on the detail", async () => {
+    const gamma = (await getTaskTrials("gamma-task", FIXTURE)).find((t) => t.reward === 0)!;
+    const detail = (await getTrial("gamma-task", gamma.id, FIXTURE))!;
+    expect(detail.errorDetail).toContain("AgentTimeoutError: Agent execution timed out");
+    expect(detail.errorDetail).toContain("Traceback (most recent call last)");
+  });
+
+  it("counts every errored trial per run, independently of pass/fail", async () => {
+    const stats = taskTrialStats(await getTaskTrialsWithTurns("gamma-task", FIXTURE));
+    // both gamma trials errored; one of them still passed → errors counts both, passes counts the one
+    expect(stats[0]).toMatchObject({ trials: 2, passes: 1, errors: 2 });
+  });
+});
+
+describe("trialOutcome", () => {
+  it("is the reward verdict, unaffected by a recorded error", () => {
+    const err = { type: "RuntimeError", message: "boom" };
+    expect(trialOutcome(mkTrial({ passed: true, reward: 1 }))).toBe("passed");
+    expect(trialOutcome(mkTrial({ passed: false, reward: 0 }))).toBe("failed");
+    expect(trialOutcome(mkTrial({ passed: false, reward: null }))).toBe("none");
+    // an error does not change the verdict — it's surfaced alongside it
+    expect(trialOutcome(mkTrial({ passed: true, reward: 1, error: err }))).toBe("passed");
+    expect(trialOutcome(mkTrial({ passed: false, reward: 0, error: err }))).toBe("failed");
+  });
+});
+
 describe("modelLabel", () => {
   it("keeps the final path segment", () => {
     expect(modelLabel("litellm_proxy/vertex_ai/gemini-3.5-flash")).toBe("gemini-3.5-flash");
@@ -127,6 +179,7 @@ function mkTrial(over: Partial<Trial>): Trial {
     isOracle: false,
     reward: 0,
     passed: false,
+    error: null,
     startedAt: null,
     finishedAt: null,
     durationSec: null,

@@ -98,6 +98,13 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
         )}
       </dl>
 
+      {trial.error && (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          <span className="font-medium">{trial.error.type}</span>
+          {trial.error.message && <span className="opacity-90"> — {trial.error.message}</span>}
+        </div>
+      )}
+
       <div className="mt-8 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
         {tabs.map((t) => (
           <TabBtn key={t} active={tab === t} onClick={() => setTab(t)}>
@@ -113,7 +120,7 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
               entries={entries}
               rawContent={trial.rawTrajectory}
               // A crashed run has no steps — surface its error inside the tab, like Arena.
-              error={entries.length === 0 ? trial.error : null}
+              error={entries.length === 0 ? trial.errorDetail : null}
             />
           </div>
         )}
