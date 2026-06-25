@@ -19,6 +19,21 @@ const TAB_LABELS: Record<TabKey, string> = {
 };
 
 function Outcome({ trial }: { trial: TrialViewModel }) {
+  if (trial.passed) {
+    return (
+      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+        Passed · reward {trial.reward}
+      </span>
+    );
+  }
+  // A recorded harness error (timeout, crash, …) is the real outcome — not a bare reward-0 fail.
+  if (trial.error) {
+    return (
+      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+        Error · {trial.error.type}
+      </span>
+    );
+  }
   if (trial.reward === null) {
     return (
       <span className="rounded bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
@@ -26,11 +41,7 @@ function Outcome({ trial }: { trial: TrialViewModel }) {
       </span>
     );
   }
-  return trial.passed ? (
-    <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-      Passed · reward {trial.reward}
-    </span>
-  ) : (
+  return (
     <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
       Failed · reward {trial.reward}
     </span>
@@ -98,6 +109,13 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
         )}
       </dl>
 
+      {trial.error && (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          <span className="font-medium">{trial.error.type}</span>
+          {trial.error.message && <span className="opacity-90"> — {trial.error.message}</span>}
+        </div>
+      )}
+
       <div className="mt-8 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
         {tabs.map((t) => (
           <TabBtn key={t} active={tab === t} onClick={() => setTab(t)}>
@@ -113,7 +131,7 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
               entries={entries}
               rawContent={trial.rawTrajectory}
               // A crashed run has no steps — surface its error inside the tab, like Arena.
-              error={entries.length === 0 ? trial.error : null}
+              error={entries.length === 0 ? trial.errorDetail : null}
             />
           </div>
         )}

@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hintVariant, taskHintStats } from "./trial-types";
+import { hintVariant, taskHintStats, trialOutcome } from "./trial-types";
 import {
   getTaskTrials,
   getTaskTrialsWithTurns,
@@ -19,9 +19,11 @@ const FIXTURE = path.join(import.meta.dirname, "__fixtures__/mini");
 describe("listTrials", () => {
   it("finds every trial across nested jobs and skips aggregate result.json", async () => {
     const trials = await listTrials(FIXTURE);
-    // 3 alpha (pass, fail, oracle) + 1 beta; the model-run aggregate is not a trial.
-    expect(trials).toHaveLength(4);
-    expect(new Set(trials.map((t) => t.slug))).toEqual(new Set(["alpha-task", "beta-task"]));
+    // 3 alpha (pass, fail, oracle) + 1 beta + 1 gamma (errored); the model-run aggregate isn't a trial.
+    expect(trials).toHaveLength(5);
+    expect(new Set(trials.map((t) => t.slug))).toEqual(
+      new Set(["alpha-task", "beta-task", "gamma-task"]),
+    );
   });
 
   it("returns [] when there is no out/jobs", async () => {
@@ -109,6 +111,46 @@ describe("getTrial", () => {
   });
 });
 
+describe("trial errors (exception_info)", () => {
+  it("lifts a recorded harness error into Trial.error and outcome 'error'", async () => {
+    const [gamma] = await getTaskTrials("gamma-task", FIXTURE);
+    expect(gamma.reward).toBe(0); // would otherwise read as a plain 'failed'
+    expect(gamma.error).toEqual({
+      type: "AgentTimeoutError",
+      message: "Agent execution timed out after 900.0 seconds",
+    });
+    expect(trialOutcome(gamma)).toBe("error");
+  });
+
+  it("leaves Trial.error null on a clean run", async () => {
+    const fail = (await getTaskTrials("alpha-task", FIXTURE)).find((t) => t.reward === 0)!;
+    expect(fail.error).toBeNull();
+    expect(trialOutcome(fail)).toBe("failed");
+  });
+
+  it("exposes the full crash text (type + message + traceback) on the detail", async () => {
+    const [gamma] = await getTaskTrials("gamma-task", FIXTURE);
+    const detail = (await getTrial("gamma-task", gamma.id, FIXTURE))!;
+    expect(detail.errorDetail).toContain("AgentTimeoutError: Agent execution timed out");
+    expect(detail.errorDetail).toContain("Traceback (most recent call last)");
+  });
+
+  it("counts errored trials per run in taskTrialStats", async () => {
+    const stats = taskTrialStats(await getTaskTrialsWithTurns("gamma-task", FIXTURE));
+    expect(stats[0]).toMatchObject({ trials: 1, passes: 0, errors: 1 });
+  });
+});
+
+describe("trialOutcome", () => {
+  it("ranks passed > error > failed > none", () => {
+    const err = { type: "RuntimeError", message: "boom" };
+    expect(trialOutcome({ passed: true, reward: 1, error: err })).toBe("passed");
+    expect(trialOutcome({ passed: false, reward: 0, error: err })).toBe("error");
+    expect(trialOutcome({ passed: false, reward: 0, error: null })).toBe("failed");
+    expect(trialOutcome({ passed: false, reward: null, error: null })).toBe("none");
+  });
+});
+
 describe("modelLabel", () => {
   it("keeps the final path segment", () => {
     expect(modelLabel("litellm_proxy/vertex_ai/gemini-3.5-flash")).toBe("gemini-3.5-flash");
@@ -127,6 +169,7 @@ function mkTrial(over: Partial<Trial>): Trial {
     isOracle: false,
     reward: 0,
     passed: false,
+    error: null,
     startedAt: null,
     finishedAt: null,
     durationSec: null,

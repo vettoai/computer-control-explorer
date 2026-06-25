@@ -6,6 +6,18 @@
 
 import type { ParsedAtifResult } from "@/lib/trajectory/atif";
 
+/**
+ * An infra/agent error the harness recorded for a trial, lifted verbatim from
+ * `result.json` → `exception_info`. This is the harness's own signal — e.g.
+ * `AgentTimeoutError`, `NonZeroAgentExitCodeError` (agent wrecked its environment),
+ * `RuntimeError`, `PermissionError` — NOT something we infer. A trial can carry one
+ * and still have reward 0; the error is the more honest outcome (see {@link trialOutcome}).
+ */
+export interface TrialError {
+  type: string; // exception_type, e.g. "AgentTimeoutError"
+  message: string; // exception_message; may be "" (some types carry only a type)
+}
+
 export interface Trial {
   id: string; // stable short hash of relPath — URL-safe, unique per trial dir
   slug: string; // dataset task slug (from task_id.path)
@@ -16,6 +28,7 @@ export interface Trial {
   isOracle: boolean;
   reward: number | null; // verifier_result.rewards.reward
   passed: boolean; // reward != null && reward >= 1
+  error: TrialError | null; // result.json exception_info, when the harness recorded one
   startedAt: string | null;
   finishedAt: string | null;
   durationSec: number | null;
@@ -36,7 +49,22 @@ export interface TrialDetail extends Trial {
   turns: number | null; // agent turns (countAgentTurns of rawTrajectory)
   testOutput: string | null;
   solveOutput: string | null; // oracle solve stdout (agent/oracle.txt); null for agent trials
-  error: string | null;
+  // Full crash text (exception type + message + traceback) for a run that produced no
+  // trajectory — the structured summary lives in the inherited `error`.
+  errorDetail: string | null;
+}
+
+/** What actually happened to a trial, in display precedence. A passed run is passed even if
+ * an exception was also recorded; otherwise a recorded error outranks a bare reward-0
+ * "failed" because the run never got a fair verdict. `none` = no reward at all. */
+export type TrialOutcome = "passed" | "error" | "failed" | "none";
+
+export function trialOutcome(
+  t: Pick<Trial, "passed" | "reward" | "error">,
+): TrialOutcome {
+  if (t.passed) return "passed";
+  if (t.error) return "error";
+  return t.reward === null ? "none" : "failed";
 }
 
 /** Per (model × task version) pass statistics for one task. Oracle excluded. */
@@ -51,6 +79,7 @@ export interface ModelStat {
   meanReward: number | null;
   avgTurns: number | null; // mean agent turns across trials that had a trajectory; null if none
   maxTurns: number | null; // max agent turns; null if no trial had a trajectory
+  errors: number; // trials in the group with a recorded exception_info
 }
 
 /** Whole-dataset pass statistics for one run, aggregated across all tasks. Grouped by
