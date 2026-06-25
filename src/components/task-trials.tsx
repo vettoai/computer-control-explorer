@@ -8,7 +8,6 @@ import {
   trialOutcome,
   type TrialWithTurns,
 } from "@/lib/dataset/trial-types";
-import { cn } from "@/lib/utils";
 
 function shortChecksum(c: string): string {
   return c.length > 10 ? c.slice(0, 10) : c;
@@ -25,7 +24,6 @@ function pct(rate: number): string {
 
 const OUTCOME_DOT = {
   passed: "bg-emerald-500",
-  error: "bg-amber-500",
   failed: "bg-red-500",
   none: "bg-zinc-400",
 } as const;
@@ -35,6 +33,19 @@ function OutcomeDot({ trial }: { trial: TrialWithTurns }) {
     <span
       className={`inline-block h-2 w-2 rounded-full ${OUTCOME_DOT[trialOutcome(trial)]}`}
     />
+  );
+}
+
+/** Additional amber chip flagging a recorded harness error — shown alongside the reward,
+ * never in place of it. Full type + message on hover. */
+function ErrorChip({ error }: { error: NonNullable<TrialWithTurns["error"]> }) {
+  return (
+    <span
+      className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+      title={error.message ? `${error.type}: ${error.message}` : error.type}
+    >
+      {error.type}
+    </span>
   );
 }
 
@@ -102,27 +113,17 @@ function TrialRow({ slug, trial }: { slug: string; trial: TrialWithTurns }) {
   // In job-grouped sections the run is the heading, so each row shows the model
   // (oracle rows have no model — show the run folder instead).
   const label = trial.isOracle ? trial.jobLabel : modelLabel(trial.model);
-  const outcome = trialOutcome(trial);
   return (
     <Link
       href={`/task/${slug}/t/${trial.id}`}
       className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-2 text-sm transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
     >
       <OutcomeDot trial={trial} />
-      <span
-        className={cn(
-          "w-24 shrink-0 truncate font-mono text-xs",
-          outcome === "error" && "text-amber-600 dark:text-amber-400",
-        )}
-        title={trial.error ? `${trial.error.type}: ${trial.error.message}` : undefined}
-      >
-        {outcome === "error"
-          ? trial.error!.type
-          : trial.reward === null
-            ? "no result"
-            : `reward ${trial.reward}`}
+      <span className="w-20 shrink-0 font-mono text-xs">
+        {trial.reward === null ? "no result" : `reward ${trial.reward}`}
       </span>
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
+      {trial.error && <ErrorChip error={trial.error} />}
       {trial.turns != null && (
         <span
           className="w-16 shrink-0 text-right text-xs tabular-nums text-zinc-400"

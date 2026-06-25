@@ -19,21 +19,6 @@ const TAB_LABELS: Record<TabKey, string> = {
 };
 
 function Outcome({ trial }: { trial: TrialViewModel }) {
-  if (trial.passed) {
-    return (
-      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-        Passed · reward {trial.reward}
-      </span>
-    );
-  }
-  // A recorded harness error (timeout, crash, …) is the real outcome — not a bare reward-0 fail.
-  if (trial.error) {
-    return (
-      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-        Error · {trial.error.type}
-      </span>
-    );
-  }
   if (trial.reward === null) {
     return (
       <span className="rounded bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
@@ -41,7 +26,11 @@ function Outcome({ trial }: { trial: TrialViewModel }) {
       </span>
     );
   }
-  return (
+  return trial.passed ? (
+    <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+      Passed · reward {trial.reward}
+    </span>
+  ) : (
     <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
       Failed · reward {trial.reward}
     </span>

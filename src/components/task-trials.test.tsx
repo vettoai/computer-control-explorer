@@ -28,21 +28,21 @@ function mkStat(over: Partial<ModelStat>): ModelStat {
 }
 
 describe("TaskTrials error surfacing", () => {
-  it("shows the error type (amber) on an errored trial row instead of a bare reward", () => {
+  it("shows an additional amber error chip alongside (not in place of) the reward", () => {
     const html = renderToStaticMarkup(
       <TaskTrials
         slug="t"
         trials={[
-          mkTrial({ id: "a", error: { type: "AgentTimeoutError", message: "timed out" } }),
+          mkTrial({ id: "a", reward: 0, error: { type: "AgentTimeoutError", message: "timed out" } }),
           mkTrial({ id: "b", reward: 1, passed: true }),
         ]}
         stats={[]}
       />,
     );
-    expect(html).toContain("AgentTimeoutError"); // shown in place of "reward 0"
-    expect(html).toContain("text-amber-400"); // amber-tinted label + dot
-    expect(html).toContain("bg-amber-500"); // outcome dot
-    expect(html).not.toContain("reward 0"); // errored row no longer reads as a plain fail
+    expect(html).toContain("reward 0"); // reward verdict still shown — the error is extra
+    expect(html).toContain("AgentTimeoutError"); // the additional error chip
+    expect(html).toContain("bg-amber-100"); // amber chip styling
+    expect(html).toContain("bg-red-500"); // failed dot stays red, not recolored by the error
   });
 
   it("renders an Errors column counting errored trials in the stats table", () => {

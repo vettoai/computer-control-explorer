@@ -10,8 +10,9 @@ import type { ParsedAtifResult } from "@/lib/trajectory/atif";
  * An infra/agent error the harness recorded for a trial, lifted verbatim from
  * `result.json` → `exception_info`. This is the harness's own signal — e.g.
  * `AgentTimeoutError`, `NonZeroAgentExitCodeError` (agent wrecked its environment),
- * `RuntimeError`, `PermissionError` — NOT something we infer. A trial can carry one
- * and still have reward 0; the error is the more honest outcome (see {@link trialOutcome}).
+ * `RuntimeError`, `PermissionError` — NOT something we infer. It is orthogonal to the
+ * reward verdict: a trial can pass or fail AND have errored (a run can time out yet still
+ * verify), so it's surfaced alongside the reward, not in place of it (see {@link trialOutcome}).
  */
 export interface TrialError {
   type: string; // exception_type, e.g. "AgentTimeoutError"
@@ -54,16 +55,13 @@ export interface TrialDetail extends Trial {
   errorDetail: string | null;
 }
 
-/** What actually happened to a trial, in display precedence. A passed run is passed even if
- * an exception was also recorded; otherwise a recorded error outranks a bare reward-0
- * "failed" because the run never got a fair verdict. `none` = no reward at all. */
-export type TrialOutcome = "passed" | "error" | "failed" | "none";
+/** The reward verdict for a trial: passed (full reward), failed (a reward below it), or none
+ * (no reward at all). A recorded harness {@link TrialError} is orthogonal and does NOT change
+ * this — surface `Trial.error` alongside the verdict, not in place of it. */
+export type TrialOutcome = "passed" | "failed" | "none";
 
-export function trialOutcome(
-  t: Pick<Trial, "passed" | "reward" | "error">,
-): TrialOutcome {
+export function trialOutcome(t: Pick<Trial, "passed" | "reward">): TrialOutcome {
   if (t.passed) return "passed";
-  if (t.error) return "error";
   return t.reward === null ? "none" : "failed";
 }
 
@@ -79,7 +77,7 @@ export interface ModelStat {
   meanReward: number | null;
   avgTurns: number | null; // mean agent turns across trials that had a trajectory; null if none
   maxTurns: number | null; // max agent turns; null if no trial had a trajectory
-  errors: number; // trials in the group with a recorded exception_info
+  errors: number; // trials with a recorded harness error (orthogonal to pass/fail — a passed trial may also have errored)
 }
 
 /** Whole-dataset pass statistics for one run, aggregated across all tasks. Grouped by
