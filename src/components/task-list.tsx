@@ -11,38 +11,14 @@ function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-// A discreet tint that flags how interesting the rate is, not good/bad: 0% (never solved,
-// even with hints) gets a yellow nudge; partly-solvable tasks (≤60%) a muted green; mostly-
-// solved tasks fade to whitish since there's little left to dig into. The hue is blended
-// ~65% into the neutral text color (color-mix) so it shows clearly without being a neon label.
-// `greenMax` is the variant's "still interesting" ceiling — wider for hints than no-hints,
-// since a solved-with-hints task is more notable than a solved-without one.
-function rateColor(rate: number, greenMax: number): string {
-  if (rate === 0)
-    return "text-[color-mix(in_oklab,var(--color-yellow-600)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-yellow-400)_65%,var(--color-zinc-300))]";
-  if (rate <= greenMax)
-    return "text-[color-mix(in_oklab,var(--color-green-700)_65%,var(--color-zinc-700))] dark:text-[color-mix(in_oklab,var(--color-green-400)_65%,var(--color-zinc-300))]";
-  return "text-zinc-400 dark:text-zinc-500";
-}
-
-function HintRate({
-  label,
-  rate,
-  greenMax,
-}: {
-  label: string;
-  rate: HintPassRate;
-  greenMax: number;
-}) {
+function HintRate({ label, rate }: { label: string; rate: HintPassRate }) {
   return (
     <span
       title={`${rate.passes} of ${rate.trials} ${label} trials passed`}
-      className="inline-flex items-baseline gap-1 rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-800/70"
+      className="text-zinc-400 dark:text-zinc-500"
     >
-      <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-        {label}
-      </span>
-      <span className={cn("text-xs font-semibold tabular-nums", rateColor(rate.passRate, greenMax))}>
+      {label}{" "}
+      <span className="font-medium tabular-nums text-zinc-600 dark:text-zinc-300">
         {pct(rate.passRate)}
       </span>
     </span>
@@ -54,11 +30,12 @@ function HintRate({
 function HintRates({ stats }: { stats: TaskHintStats | undefined }) {
   if (!stats || (!stats.withHints && !stats.withoutHints)) return null;
   return (
-    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-      {stats.withHints && <HintRate label="hints" rate={stats.withHints} greenMax={0.8} />}
-      {stats.withoutHints && (
-        <HintRate label="no hints" rate={stats.withoutHints} greenMax={0.6} />
+    <div className="flex shrink-0 items-center gap-2 text-xs">
+      {stats.withHints && <HintRate label="hints" rate={stats.withHints} />}
+      {stats.withHints && stats.withoutHints && (
+        <span className="text-zinc-300 dark:text-zinc-600">·</span>
       )}
+      {stats.withoutHints && <HintRate label="no hints" rate={stats.withoutHints} />}
     </div>
   );
 }
