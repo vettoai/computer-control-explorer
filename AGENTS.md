@@ -26,9 +26,14 @@ Supabase, auth, or campaign/annotator code. Arena's `use-trajectory-data` hook (
 
 `output: 'export'` (static HTML) is a first-class build target. Do not introduce features
 incompatible with it: no API Routes, no SSR-on-request data, no Server Actions, no
-middleware, no runtime-only image optimization. Dynamic routes use `generateStaticParams`.
-Data is read in Server Components — at build time for the static export, at request time for
-the Docker server build — via the **same loader**, toggled by `EXPLORER_MODE`.
+runtime-only image optimization. Dynamic routes use `generateStaticParams`. Data is read in
+Server Components — at build time for the static export, at request time for the Docker
+server build — via the **same loader**, toggled by `EXPLORER_MODE`.
+
+One sanctioned exception: `src/proxy.ts`, the optional `EXPLORER_PASSWORD` gate. It is
+server-only by nature (export builds omit proxies with a warning, so the export stays
+passwordless and fully working). Keep it that way: the proxy may only *gate access*, never
+serve or transform data — no page may depend on it existing.
 
 ## 4. Quality bar
 

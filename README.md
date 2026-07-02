@@ -67,6 +67,21 @@ docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
   computer-control-explorer
 ```
 
+**Password protection (optional)** — when exposing the server on a public URL, set
+`EXPLORER_PASSWORD` and every visitor must enter that shared password once (kept in a
+cookie for 30 days) before seeing anything:
+
+```bash
+docker run --rm -p 3000:3000 -v /path/to/bundle:/data:ro -e DATASET_DIR=/data \
+  -e EXPLORER_PASSWORD='choose-a-strong-password' \
+  vettoai/computer-control-explorer
+```
+
+The same variable works with `npm run dev` / `npm run start`. Leave it unset and no login
+is shown. It applies only to the server builds: the **static export is always
+passwordless** — the exported HTML physically contains the dataset, so a login page could
+not actually protect it.
+
 ## What it shows
 
 Per task: a collapsible **file tree** with syntax-highlighted file contents and metadata,
