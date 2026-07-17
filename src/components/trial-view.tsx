@@ -82,6 +82,15 @@ export function TrialView({ taskTitle, trial }: { taskTitle: string; trial: Tria
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <Outcome trial={trial} />
+        {!trial.isOracle && trial.rawTrajectory && (
+          <Link
+            href={`/task/${trial.slug}/t/${trial.id}/cinema`}
+            className="ml-auto rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            title="Watch this run one turn at a time"
+          >
+            ▶ Cinema mode
+          </Link>
+        )}
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">

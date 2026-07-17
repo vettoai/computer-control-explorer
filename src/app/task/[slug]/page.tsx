@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { TaskDetailView } from "@/components/task-detail-view";
+import { pickReviewTrials } from "@/lib/dataset/interesting";
 import { getTask, listTasks } from "@/lib/dataset/loader";
-import { getTaskTrialsWithTurns, taskTrialStats } from "@/lib/dataset/trials";
+import { getTaskReviewCandidates, taskTrialStats } from "@/lib/dataset/trials";
 
 /**
  * Enumerate task pages at build time. For a static export this is the complete set of
@@ -21,8 +22,9 @@ export default async function TaskPage({
   const task = await getTask(slug);
   if (!task) notFound();
 
-  const trials = await getTaskTrialsWithTurns(slug);
+  const trials = await getTaskReviewCandidates(slug);
   const stats = taskTrialStats(trials);
+  const reviewPicks = pickReviewTrials(trials);
 
-  return <TaskDetailView task={task} trials={trials} stats={stats} />;
+  return <TaskDetailView task={task} trials={trials} stats={stats} reviewPicks={reviewPicks} />;
 }
