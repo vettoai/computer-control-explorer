@@ -114,31 +114,42 @@ function TrialRow({ slug, trial }: { slug: string; trial: TrialWithTurns }) {
   // (oracle rows have no model — show the run folder instead).
   const label = trial.isOracle ? trial.jobLabel : modelLabel(trial.model);
   return (
-    <Link
-      href={`/task/${slug}/t/${trial.id}`}
-      className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-2 text-sm transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
-    >
-      <OutcomeDot trial={trial} />
-      <span className="w-20 shrink-0 font-mono text-xs">
-        {trial.reward === null ? "no result" : `reward ${trial.reward}`}
-      </span>
-      <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
-      {trial.error && <ErrorChip error={trial.error} />}
-      {trial.turns != null && (
-        <span
-          className="w-16 shrink-0 text-right text-xs tabular-nums text-zinc-400"
-          title={`${trial.turns} agent turns`}
+    <div className="flex items-center gap-2">
+      <Link
+        href={`/task/${slug}/t/${trial.id}`}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-zinc-200 px-3 py-2 text-sm transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+      >
+        <OutcomeDot trial={trial} />
+        <span className="w-20 shrink-0 font-mono text-xs">
+          {trial.reward === null ? "no result" : `reward ${trial.reward}`}
+        </span>
+        <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
+        {trial.error && <ErrorChip error={trial.error} />}
+        {trial.turns != null && (
+          <span
+            className="w-16 shrink-0 text-right text-xs tabular-nums text-zinc-400"
+            title={`${trial.turns} agent turns`}
+          >
+            {trial.turns} turns
+          </span>
+        )}
+        <span className="shrink-0 text-xs text-zinc-400">{started}</span>
+        {trial.durationSec != null && (
+          <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-400">
+            {trial.durationSec}s
+          </span>
+        )}
+      </Link>
+      {!trial.isOracle && (
+        <Link
+          href={`/task/${slug}/t/${trial.id}/cinema`}
+          title="Watch turn by turn (cinema mode)"
+          className="shrink-0 rounded-md border border-zinc-200 px-2 py-2 text-xs text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-800 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
         >
-          {trial.turns} turns
-        </span>
+          ▶
+        </Link>
       )}
-      <span className="shrink-0 text-xs text-zinc-400">{started}</span>
-      {trial.durationSec != null && (
-        <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-400">
-          {trial.durationSec}s
-        </span>
-      )}
-    </Link>
+    </div>
   );
 }
 

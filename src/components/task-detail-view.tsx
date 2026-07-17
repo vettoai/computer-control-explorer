@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { ReviewPicks } from "@/components/review-picks";
 import { TaskFiles } from "@/components/task-files";
 import { TaskTrials } from "@/components/task-trials";
+import type { ReviewPick } from "@/lib/dataset/interesting";
 import type { ModelStat, TrialWithTurns } from "@/lib/dataset/trial-types";
 import type { TaskDetail } from "@/lib/dataset/types";
 import { cn } from "@/lib/utils";
@@ -15,10 +17,12 @@ export function TaskDetailView({
   task,
   trials,
   stats,
+  reviewPicks = [],
 }: {
   task: TaskDetail;
   trials: TrialWithTurns[];
   stats: ModelStat[];
+  reviewPicks?: ReviewPick[];
 }) {
   const [tab, setTab] = useState<Tab>("files");
 
@@ -55,7 +59,8 @@ export function TaskDetailView({
         </TabBtn>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        {tab === "trials" && <ReviewPicks slug={task.slug} picks={reviewPicks} />}
         {tab === "files" ? (
           <TaskFiles task={task} />
         ) : (

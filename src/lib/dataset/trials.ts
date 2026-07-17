@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { countAgentTurns, type ParsedAtifResult, parseAtifTrajectory } from "@/lib/trajectory/atif";
 
+import { type ReviewCandidate, parseFailedTests } from "./interesting";
 import { datasetDir } from "./loader";
 import {
   type GlobalRunStat,
@@ -160,9 +161,29 @@ async function walkTrials(
   }
 }
 
+/**
+ * Production-only memo for the out/jobs walk. A large bundle (e.g. a 100-task board × 20+
+ * configs × k=5) holds >10k result.json files; walking them on every request makes each
+ * page load take seconds in the Docker server. The bundle is immutable in practice
+ * (mounted read-only), so a short TTL is safe. Dev and tests always re-walk.
+ */
+const WALK_CACHE_TTL_MS = 120_000;
+const walkCache = new Map<string, { at: number; trials: Promise<Trial[]> }>();
+
 /** All trials in the bundle, across every job. Sorted by slug, then model, then start. */
 export async function listTrials(dir: string | null = datasetDir()): Promise<Trial[]> {
   if (!dir) return [];
+  if (process.env.NODE_ENV === "production") {
+    const hit = walkCache.get(dir);
+    if (hit && Date.now() - hit.at < WALK_CACHE_TTL_MS) return hit.trials;
+    const trials = walkAllTrials(dir);
+    walkCache.set(dir, { at: Date.now(), trials });
+    return trials;
+  }
+  return walkAllTrials(dir);
+}
+
+async function walkAllTrials(dir: string): Promise<Trial[]> {
   const jobsRoot = path.join(dir, "out", "jobs");
   let jobs: import("node:fs").Dirent[];
   try {
@@ -211,6 +232,27 @@ export async function getTaskTrialsWithTurns(
   const trials = await getTaskTrials(slug, dir);
   if (!dir) return trials.map((t) => ({ ...t, turns: null }));
   return Promise.all(trials.map(async (t) => ({ ...t, turns: await trialTurns(t, dir) })));
+}
+
+/**
+ * Review candidates for one task: trials with turn counts AND failing-test signatures
+ * (parsed from each trial's verifier stdout). Feeds the deterministic review-picks panel
+ * (lib/dataset/interesting.ts). I/O is bounded to one task's trials.
+ */
+export async function getTaskReviewCandidates(
+  slug: string,
+  dir: string | null = datasetDir(),
+): Promise<ReviewCandidate[]> {
+  const trials = await getTaskTrialsWithTurns(slug, dir);
+  if (!dir) return trials.map((t) => ({ ...t, failedTests: [] }));
+  return Promise.all(
+    trials.map(async (t) => {
+      const testOutput = t.passed
+        ? null
+        : await readText(path.join(dir, t.relPath, "verifier", "test-stdout.txt"));
+      return { ...t, failedTests: parseFailedTests(testOutput) };
+    }),
+  );
 }
 
 /** Per (model × checksum) pass stats for a task's non-oracle trials, grouped by

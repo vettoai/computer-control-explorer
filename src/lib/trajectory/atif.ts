@@ -38,18 +38,18 @@ export function stripNoisyLogLines(text: string): string {
     .join("\n");
 }
 
-interface AtifToolCall {
+export interface AtifToolCall {
   tool_call_id: string;
   function_name: string;
   arguments: Record<string, unknown>;
 }
 
-interface AtifObservationResult {
+export interface AtifObservationResult {
   source_call_id: string;
   content: string;
 }
 
-interface AtifStep {
+export interface AtifStep {
   step_id?: string;
   timestamp?: string;
   source: string;
@@ -58,14 +58,14 @@ interface AtifStep {
   observation?: { results: AtifObservationResult[] } | string;
 }
 
-interface AtifTrajectory {
+export interface AtifTrajectory {
   schema_version: string;
   agent?: { name: string; model_name?: string };
   steps: AtifStep[];
   final_metrics?: Record<string, unknown>;
 }
 
-function parseToolCalls(raw: AtifToolCall[] | string | undefined): AtifToolCall[] {
+export function parseToolCalls(raw: AtifToolCall[] | string | undefined): AtifToolCall[] {
   if (!raw) return [];
   if (typeof raw === "string") {
     try {
@@ -77,7 +77,7 @@ function parseToolCalls(raw: AtifToolCall[] | string | undefined): AtifToolCall[
   return raw;
 }
 
-function parseObservation(
+export function parseObservation(
   raw: { results: AtifObservationResult[] } | string | undefined,
 ): string | null {
   if (!raw) return null;
@@ -95,23 +95,44 @@ function parseObservation(
   return obs.results[0].content;
 }
 
-function extractCommand(tc: AtifToolCall): string {
+export function extractCommand(tc: AtifToolCall): string {
   // Codex: arguments.cmd
   if (tc.arguments.cmd) return String(tc.arguments.cmd);
   // Terminus-2: arguments.keystrokes (bash_command)
   if (tc.arguments.keystrokes) return String(tc.arguments.keystrokes).trim();
+  // Claude-code: Bash {command}, Read/Write/Edit {file_path}, Grep/Glob {pattern}
+  if (tc.arguments.command) return String(tc.arguments.command);
+  if (tc.arguments.file_path) return `${tc.function_name} ${tc.arguments.file_path}`;
+  if (tc.arguments.pattern) return `${tc.function_name} ${tc.arguments.pattern}`;
+  // Codex apply_patch {input}: surface the patched file from the header.
+  if (tc.function_name === "apply_patch" && typeof tc.arguments.input === "string") {
+    const m = /\*\*\*\s*(?:Update|Add|Delete) File:\s*(.+)/.exec(tc.arguments.input);
+    return m ? `apply_patch ${m[1].trim()}` : "apply_patch";
+  }
   if (tc.arguments.content) return `write ${tc.function_name}`;
   // mark_task_complete, etc.
   return tc.function_name;
 }
 
-function isNonCommandTool(fnName: string): boolean {
+/** The tool call's write payload (file content, patch body, edit pair) for display —
+ * distinct from its OUTPUT (the observation). Null for plain commands. */
+export function extractToolInput(tc: AtifToolCall): string | null {
+  const a = tc.arguments;
+  if (typeof a.content === "string" && a.content) return a.content;
+  if (typeof a.input === "string" && a.input) return a.input;
+  if (typeof a.old_string === "string" && typeof a.new_string === "string") {
+    return `--- old\n${a.old_string}\n+++ new\n${a.new_string}`;
+  }
+  return null;
+}
+
+export function isNonCommandTool(fnName: string): boolean {
   return (
     fnName === "write_stdin" || fnName === "write_file" || fnName === "mark_task_complete"
   );
 }
 
-function deriveExitStatus(output: string | null, fnName: string): "completed" | "failed" {
+export function deriveExitStatus(output: string | null, fnName: string): "completed" | "failed" {
   if (isNonCommandTool(fnName)) return "completed";
   if (!output) return "completed";
   if (output.includes("exit code: 0") || output.includes("Process exited with code 0"))
@@ -137,7 +158,7 @@ function parseToolStep(
   };
 }
 
-function cleanMessage(msg: string): string {
+export function cleanMessage(msg: string): string {
   // Strip "Analysis: " prefix from terminus-2 messages.
   return msg.replace(/^Analysis:\s*/i, "");
 }
