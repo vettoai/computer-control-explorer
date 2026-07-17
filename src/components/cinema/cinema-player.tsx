@@ -210,19 +210,22 @@ function ToolBlock({
   const [outputShown, setOutputShown] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const onDoneRef = useLatest(onDone);
+  const hasOutput = !!tool.output?.trim();
 
-  // After the command finishes typing, "run" it briefly, then reveal the output.
+  // After the command finishes typing, "run" it briefly, then start revealing the output.
+  // With no output to reveal, the tool is done here; otherwise done fires when the output
+  // reveal completes (see CollapsiblePre onRevealed below).
   useEffect(() => {
     if (!cmdDone || outputShown) return;
     const id = setTimeout(
       () => {
         setOutputShown(true);
-        onDoneRef.current();
+        if (!hasOutput) onDoneRef.current();
       },
       skip ? 0 : RUN_PAUSE_MS,
     );
     return () => clearTimeout(id);
-  }, [cmdDone, outputShown, skip, onDoneRef]);
+  }, [cmdDone, outputShown, skip, hasOutput, onDoneRef]);
 
   if (!active && !cmdDone) return null;
 
@@ -254,45 +257,70 @@ function ToolBlock({
           onToggle={() => setExpanded(!expanded)}
         />
       )}
-      {outputShown && tool.output?.trim() && (
+      {outputShown && hasOutput && (
         <CollapsiblePre
-          text={tool.output}
+          text={tool.output!}
           label="output"
           className="text-zinc-400"
           expanded={expanded}
           onToggle={() => setExpanded(!expanded)}
+          reveal={{ skip, onRevealed: () => onDoneRef.current() }}
         />
       )}
     </div>
   );
 }
 
-/** Collapsed-to-8-lines pre block used for a tool's input payload and output. */
+/**
+ * Collapsed-to-8-lines pre block used for a tool's input payload and output. With
+ * `reveal` set, the (visible) lines slide in top-to-bottom instead of appearing at once,
+ * and `onRevealed` fires when the reveal completes.
+ */
 function CollapsiblePre({
   text,
   label,
   className,
   expanded,
   onToggle,
+  reveal,
 }: {
   text: string;
   label: string;
   className: string;
   expanded: boolean;
   onToggle: () => void;
+  reveal?: { skip: boolean; onRevealed: () => void };
 }) {
   const lines = useMemo(() => text.split("\n"), [text]);
   const isLong = lines.length > COLLAPSED_OUTPUT_LINES;
-  const visible = expanded || !isLong ? text : lines.slice(0, COLLAPSED_OUTPUT_LINES).join("\n");
+  const cappedCount = expanded || !isLong ? lines.length : COLLAPSED_OUTPUT_LINES;
+
+  // Line-by-line downward reveal of the visible lines (whole block instantly when not
+  // animating). The target is frozen at mount (the collapsed view); expanding afterwards
+  // shows the rest directly.
+  const [revealTarget] = useState(cappedCount);
+  const { count: revealed, done: revealDone } = useReveal(
+    reveal ? revealTarget : 0,
+    !!reveal,
+    reveal?.skip ?? false,
+    () => reveal?.onRevealed(),
+    30,
+    1100,
+  );
+  const showAll = !reveal || revealDone;
+  const visible = showAll
+    ? lines.slice(0, cappedCount).join("\n")
+    : lines.slice(0, revealed).join("\n");
+
   return (
     <div className="border-t border-zinc-800/80 bg-zinc-950/80">
       <pre
-        className={`max-h-[45vh] overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-relaxed animate-[cinema-fadein_0.25s_ease-out] ${className}`}
+        className={`max-h-[45vh] overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-relaxed ${className}`}
       >
         {visible}
-        {isLong && !expanded && "\n…"}
+        {isLong && !expanded && showAll && "\n…"}
       </pre>
-      {isLong && (
+      {isLong && showAll && (
         <button
           type="button"
           onClick={(e) => {
@@ -564,6 +592,44 @@ export function CinemaPlayer(props: CinemaTrialProps) {
 
   const prev = useCallback(() => goto(pos - 1), [goto, pos]);
 
+  // Autoscroll: while a turn is animating, keep the pane pinned to the newest content so
+  // streaming text / appearing tool blocks never run below the fold. The pin follows only
+  // while the user is at (or near) the bottom — scrolling up detaches it, scrolling back
+  // down re-attaches. Each turn starts scrolled to the top.
+  const mainRef = useRef<HTMLElement>(null);
+  const followRef = useRef(true);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (el) el.scrollTop = 0;
+    followRef.current = true;
+  }, [pos]);
+
+  useEffect(() => {
+    if (!turn || turnDone) return;
+    const id = setInterval(() => {
+      const el = mainRef.current;
+      if (!el || !followRef.current) return;
+      if (el.scrollHeight > el.scrollTop + el.clientHeight) el.scrollTop = el.scrollHeight;
+    }, 80);
+    return () => clearInterval(id);
+  }, [turn, turnDone]);
+
+  // One final pin when the turn finishes (the phase note lands after the last tool).
+  useEffect(() => {
+    if (!turnDone) return;
+    const id = setTimeout(() => {
+      const el = mainRef.current;
+      if (el && followRef.current) el.scrollTop = el.scrollHeight;
+    }, 80);
+    return () => clearTimeout(id);
+  }, [turnDone]);
+
+  const onMainScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    followRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 48;
+  }, []);
+
   // Skipping fast-forwards the stage to "fully shown" (children also honor `skip`).
   useEffect(() => {
     if (skip && turn) {
@@ -676,7 +742,11 @@ export function CinemaPlayer(props: CinemaTrialProps) {
       </div>
 
       {/* Stage */}
-      <main className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 py-10">
+      <main
+        ref={mainRef}
+        onScroll={onMainScroll}
+        className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 py-10"
+      >
         {atTitle && (
           <TitleCard
             taskTitle={props.taskTitle}
