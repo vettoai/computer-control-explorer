@@ -697,7 +697,7 @@ export function CinemaPlayer(props: CinemaTrialProps) {
 
   return (
     <div
-      className="flex min-h-dvh flex-col bg-zinc-950 text-zinc-100"
+      className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100"
       onClick={() => {
         if (turn && !turnDone && !skip) setSkip(true);
       }}
