@@ -41,7 +41,7 @@ describe("parseAtifTurns", () => {
     expect(turns[0].tools[1].output).toBe("# readme");
   });
 
-  it("skips non-agent steps; a tool-only step joins the preceding thought turn", () => {
+  it("skips non-agent steps; thought-only and tool-only steps are separate turns", () => {
     const raw = atif([
       { source: "user", message: "task" },
       agentStep({ step_id: "s1", message: "Let me think about the approach." }),
@@ -55,10 +55,11 @@ describe("parseAtifTurns", () => {
       }),
     ]);
     const { turns } = parseAtifTurns(raw);
-    expect(turns).toHaveLength(1);
+    expect(turns).toHaveLength(2);
     expect(turns[0].thought).toContain("approach");
-    expect(turns[0].tools).toHaveLength(1);
-    expect(turns[0].tools[0].command).toBe("pytest -x");
+    expect(turns[0].tools).toHaveLength(0);
+    expect(turns[1].thought).toBeNull();
+    expect(turns[1].tools[0].command).toBe("pytest -x");
   });
 
   it("marks a failing command from its exit code", () => {
@@ -123,7 +124,7 @@ describe("classifyTurnPhase", () => {
 });
 
 describe("parseAtifTurns — claude-code exploded shape", () => {
-  it("drops structural no-ops and coalesces Executed tool steps into the thought turn", () => {
+  it("drops structural no-op steps; every other step is its own turn", () => {
     const raw = atif([
       { source: "user", message: "task" },
       agentStep({ step_id: 2, message: "I'll read the config then run the tests." }),
@@ -143,11 +144,12 @@ describe("parseAtifTurns — claude-code exploded shape", () => {
       agentStep({ step_id: 6, message: "All tests pass — done." }),
     ]);
     const { turns } = parseAtifTurns(raw);
-    expect(turns).toHaveLength(2);
+    expect(turns).toHaveLength(4); // thought, Read, Bash, thought — the no-op is gone
     expect(turns[0].thought).toContain("read the config");
-    expect(turns[0].tools.map((t) => t.command)).toEqual(["Read /app/config.toml", "pytest -q"]);
-    expect(turns[0].tools[1].output).toBe("3 passed");
-    expect(turns[1].thought).toContain("done");
+    expect(turns[1].tools[0].command).toBe("Read /app/config.toml");
+    expect(turns[2].tools[0].command).toBe("pytest -q");
+    expect(turns[2].tools[0].output).toBe("3 passed");
+    expect(turns[3].thought).toContain("done");
     // No "(empty turn)": every turn has a thought or tools.
     expect(turns.every((t) => t.thought || t.tools.length > 0)).toBe(true);
   });
