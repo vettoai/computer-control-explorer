@@ -224,11 +224,6 @@ function ToolBlock({
     return () => clearTimeout(id);
   }, [cmdDone, outputShown, skip, onDoneRef]);
 
-  const lines = useMemo(() => (tool.output ?? "").split("\n"), [tool.output]);
-  const isLong = lines.length > COLLAPSED_OUTPUT_LINES;
-  const visibleOutput =
-    expanded || !isLong ? (tool.output ?? "") : lines.slice(0, COLLAPSED_OUTPUT_LINES).join("\n");
-
   if (!active && !cmdDone) return null;
 
   return (
@@ -250,25 +245,64 @@ function ToolBlock({
           </span>
         )}
       </div>
+      {outputShown && tool.input?.trim() && (
+        <CollapsiblePre
+          text={tool.input}
+          label="input"
+          className="text-sky-200/80"
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+        />
+      )}
       {outputShown && tool.output?.trim() && (
-        <div className="border-t border-zinc-800/80 bg-zinc-950/80">
-          <pre className="max-h-[45vh] overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-400 animate-[cinema-fadein_0.25s_ease-out]">
-            {visibleOutput}
-            {isLong && !expanded && "\n…"}
-          </pre>
-          {isLong && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpanded(!expanded);
-              }}
-              className="w-full border-t border-zinc-800/60 px-3 py-1 text-left text-[10px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
-            >
-              {expanded ? "Collapse output" : `Show all ${lines.length} lines`}
-            </button>
-          )}
-        </div>
+        <CollapsiblePre
+          text={tool.output}
+          label="output"
+          className="text-zinc-400"
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Collapsed-to-8-lines pre block used for a tool's input payload and output. */
+function CollapsiblePre({
+  text,
+  label,
+  className,
+  expanded,
+  onToggle,
+}: {
+  text: string;
+  label: string;
+  className: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const lines = useMemo(() => text.split("\n"), [text]);
+  const isLong = lines.length > COLLAPSED_OUTPUT_LINES;
+  const visible = expanded || !isLong ? text : lines.slice(0, COLLAPSED_OUTPUT_LINES).join("\n");
+  return (
+    <div className="border-t border-zinc-800/80 bg-zinc-950/80">
+      <pre
+        className={`max-h-[45vh] overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-relaxed animate-[cinema-fadein_0.25s_ease-out] ${className}`}
+      >
+        {visible}
+        {isLong && !expanded && "\n…"}
+      </pre>
+      {isLong && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className="w-full border-t border-zinc-800/60 px-3 py-1 text-left text-[10px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+        >
+          {expanded ? `Collapse ${label}` : `Show all ${lines.length} ${label} lines`}
+        </button>
       )}
     </div>
   );

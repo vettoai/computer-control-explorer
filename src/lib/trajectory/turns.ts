@@ -20,6 +20,7 @@ import {
   cleanMessage,
   deriveExitStatus,
   extractCommand,
+  extractToolInput,
   isNonCommandTool,
   parseStructuredAgentMessage,
   parseToolCalls,
@@ -39,6 +40,8 @@ export interface TurnTool {
   command: string;
   /** Tool function name, e.g. bash_command, write_file, mark_task_complete. */
   functionName: string;
+  /** The tool's write payload (file content / patch body / edit pair), when it has one. */
+  input: string | null;
   /** The tool's captured output, when the trajectory recorded one. */
   output: string | null;
   status: "completed" | "failed";
@@ -87,6 +90,7 @@ function toTool(tc: AtifToolCall, output: string | null, id: string): TurnTool {
     id,
     command: extractCommand(tc),
     functionName: tc.function_name,
+    input: extractToolInput(tc),
     output,
     status: deriveExitStatus(output, tc.function_name),
   };
@@ -133,8 +137,19 @@ export function classifyTurnPhase(
   return turn.thought && turn.index === 0 ? "plan" : "explore";
 }
 
-/** Parse a raw ATIF trajectory.json into turns. Throws on unparseable JSON (callers show
- * the raw file instead); returns zero turns for a trajectory with no agent steps. */
+/**
+ * Parse a raw ATIF trajectory.json into turns. Throws on unparseable JSON (callers show
+ * the raw file instead); returns zero turns for a trajectory with no agent steps.
+ *
+ * Two step shapes exist in the wild:
+ * - terminus-2 / codex-style: one step = thought + its tool calls together → one step is
+ *   one turn.
+ * - claude-code-style (exploded): a thought step with no tools, then a structural no-op
+ *   step (empty message, no tools, stop_reason tool_use), then one `Executed <Tool>` step
+ *   per tool call. The real turn is the thought plus every tool step that follows it, so
+ *   no-op steps are DROPPED and tool-only steps COALESCE into the preceding thought turn.
+ *   Tool-only steps with no preceding thought turn stand alone.
+ */
 export function parseAtifTurns(content: string): ParsedTurns {
   const data: AtifTrajectory = JSON.parse(content);
   const steps = Array.isArray(data.steps) ? data.steps : [];
@@ -143,7 +158,7 @@ export function parseAtifTurns(content: string): ParsedTurns {
   const turns: TrajectoryTurn[] = [];
   for (let i = 0; i < agentSteps.length; i++) {
     const step = agentSteps[i];
-    const stepId = step.step_id ?? `turn-${i}`;
+    const stepId = String(step.step_id ?? `turn-${i}`);
     const toolCalls = parseToolCalls(step.tool_calls);
     const outputs = observationByCall(step);
 
@@ -157,11 +172,21 @@ export function parseAtifTurns(content: string): ParsedTurns {
       toTool(tc, outputs.get(tc.tool_call_id) ?? (j === 0 ? fallbackOutput(step) : null), `${stepId}-t${j}`),
     );
 
+    const hasThought = !!thought?.trim();
+    if (!hasThought && tools.length === 0) continue; // structural no-op (tool_use boundary)
+
+    const prev = turns[turns.length - 1];
+    if (!hasThought && prev?.thought) {
+      // Tool-only step following a thought turn: these are that thought's actions.
+      prev.tools.push(...tools);
+      continue;
+    }
+
     const ts = step.timestamp ? Date.parse(step.timestamp) : NaN;
     turns.push({
-      index: i,
+      index: turns.length,
       stepId,
-      thought: thought?.trim() ? thought : null,
+      thought: hasThought ? thought : null,
       tools,
       timestamp: Number.isFinite(ts) ? ts : null,
       phase: "plan", // assigned below once prev-failure context exists

@@ -41,7 +41,7 @@ describe("parseAtifTurns", () => {
     expect(turns[0].tools[1].output).toBe("# readme");
   });
 
-  it("skips non-agent steps and handles thought-only turns", () => {
+  it("skips non-agent steps; a tool-only step joins the preceding thought turn", () => {
     const raw = atif([
       { source: "user", message: "task" },
       agentStep({ step_id: "s1", message: "Let me think about the approach." }),
@@ -55,10 +55,10 @@ describe("parseAtifTurns", () => {
       }),
     ]);
     const { turns } = parseAtifTurns(raw);
-    expect(turns).toHaveLength(2);
-    expect(turns[0].tools).toHaveLength(0);
+    expect(turns).toHaveLength(1);
     expect(turns[0].thought).toContain("approach");
-    expect(turns[1].thought).toBeNull();
+    expect(turns[0].tools).toHaveLength(1);
+    expect(turns[0].tools[0].command).toBe("pytest -x");
   });
 
   it("marks a failing command from its exit code", () => {
@@ -82,6 +82,7 @@ describe("classifyTurnPhase", () => {
     id: "t",
     command,
     functionName: "bash_command",
+    input: null,
     output: null,
     status,
   });
@@ -99,7 +100,7 @@ describe("classifyTurnPhase", () => {
         {
           index: 5,
           thought: null,
-          tools: [{ id: "t", command: "mark_task_complete", functionName: "mark_task_complete", output: null, status: "completed" }],
+          tools: [{ id: "t", command: "mark_task_complete", functionName: "mark_task_complete", input: null, output: null, status: "completed" }],
         },
         opts,
       ),
@@ -114,10 +115,58 @@ describe("classifyTurnPhase", () => {
   it("verify outranks debug so a re-test after a failure reads as verifying", () => {
     expect(
       classifyTurnPhase(
-        { index: 6, thought: null, tools: [{ id: "t", command: "pytest -q", functionName: "bash_command", output: null, status: "completed" }] },
+        { index: 6, thought: null, tools: [{ id: "t", command: "pytest -q", functionName: "bash_command", input: null, output: null, status: "completed" }] },
         { prevFailed: true, isLast: false },
       ),
     ).toBe("verify");
+  });
+});
+
+describe("parseAtifTurns — claude-code exploded shape", () => {
+  it("drops structural no-ops and coalesces Executed tool steps into the thought turn", () => {
+    const raw = atif([
+      { source: "user", message: "task" },
+      agentStep({ step_id: 2, message: "I'll read the config then run the tests." }),
+      agentStep({ step_id: 3, message: "" }), // no-op: tool_use boundary, no tools
+      agentStep({
+        step_id: 4,
+        message: "Executed Read toolu_abc",
+        tool_calls: [{ tool_call_id: "toolu_abc", function_name: "Read", arguments: { file_path: "/app/config.toml" } }],
+        observation: { results: [{ source_call_id: "toolu_abc", content: "[tool]\nkey=1" }] },
+      }),
+      agentStep({
+        step_id: 5,
+        message: "Executed Bash toolu_def",
+        tool_calls: [{ tool_call_id: "toolu_def", function_name: "Bash", arguments: { command: "pytest -q", description: "run tests" } }],
+        observation: { results: [{ source_call_id: "toolu_def", content: "3 passed" }] },
+      }),
+      agentStep({ step_id: 6, message: "All tests pass — done." }),
+    ]);
+    const { turns } = parseAtifTurns(raw);
+    expect(turns).toHaveLength(2);
+    expect(turns[0].thought).toContain("read the config");
+    expect(turns[0].tools.map((t) => t.command)).toEqual(["Read /app/config.toml", "pytest -q"]);
+    expect(turns[0].tools[1].output).toBe("3 passed");
+    expect(turns[1].thought).toContain("done");
+    // No "(empty turn)": every turn has a thought or tools.
+    expect(turns.every((t) => t.thought || t.tools.length > 0)).toBe(true);
+  });
+
+  it("keeps a leading tool-only step as its own turn and surfaces write payloads", () => {
+    const raw = atif([
+      agentStep({
+        step_id: 2,
+        message: "Executed Write toolu_w",
+        tool_calls: [
+          { tool_call_id: "toolu_w", function_name: "Write", arguments: { file_path: "/app/x.py", content: "print('hi')\n" } },
+        ],
+      }),
+    ]);
+    const { turns } = parseAtifTurns(raw);
+    expect(turns).toHaveLength(1);
+    expect(turns[0].thought).toBeNull();
+    expect(turns[0].tools[0].command).toBe("Write /app/x.py");
+    expect(turns[0].tools[0].input).toBe("print('hi')\n");
   });
 });
 
@@ -127,13 +176,13 @@ describe("phaseSections", () => {
       agentStep({ step_id: "a", message: "Plan first." }),
       agentStep({
         step_id: "b",
-        message: "",
+        message: "Look at the tree.",
         tool_calls: [{ tool_call_id: "c", function_name: "bash_command", arguments: { keystrokes: "ls" } }],
         observation: { results: [{ source_call_id: "c", content: "ok" }] },
       }),
       agentStep({
         step_id: "d",
-        message: "",
+        message: "Read the file.",
         tool_calls: [{ tool_call_id: "e", function_name: "bash_command", arguments: { keystrokes: "cat f" } }],
         observation: { results: [{ source_call_id: "e", content: "ok" }] },
       }),

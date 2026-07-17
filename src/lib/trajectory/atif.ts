@@ -100,9 +100,30 @@ export function extractCommand(tc: AtifToolCall): string {
   if (tc.arguments.cmd) return String(tc.arguments.cmd);
   // Terminus-2: arguments.keystrokes (bash_command)
   if (tc.arguments.keystrokes) return String(tc.arguments.keystrokes).trim();
+  // Claude-code: Bash {command}, Read/Write/Edit {file_path}, Grep/Glob {pattern}
+  if (tc.arguments.command) return String(tc.arguments.command);
+  if (tc.arguments.file_path) return `${tc.function_name} ${tc.arguments.file_path}`;
+  if (tc.arguments.pattern) return `${tc.function_name} ${tc.arguments.pattern}`;
+  // Codex apply_patch {input}: surface the patched file from the header.
+  if (tc.function_name === "apply_patch" && typeof tc.arguments.input === "string") {
+    const m = /\*\*\*\s*(?:Update|Add|Delete) File:\s*(.+)/.exec(tc.arguments.input);
+    return m ? `apply_patch ${m[1].trim()}` : "apply_patch";
+  }
   if (tc.arguments.content) return `write ${tc.function_name}`;
   // mark_task_complete, etc.
   return tc.function_name;
+}
+
+/** The tool call's write payload (file content, patch body, edit pair) for display —
+ * distinct from its OUTPUT (the observation). Null for plain commands. */
+export function extractToolInput(tc: AtifToolCall): string | null {
+  const a = tc.arguments;
+  if (typeof a.content === "string" && a.content) return a.content;
+  if (typeof a.input === "string" && a.input) return a.input;
+  if (typeof a.old_string === "string" && typeof a.new_string === "string") {
+    return `--- old\n${a.old_string}\n+++ new\n${a.new_string}`;
+  }
+  return null;
 }
 
 export function isNonCommandTool(fnName: string): boolean {
