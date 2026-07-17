@@ -141,9 +141,14 @@ export function classifyTurnPhase(
  * Parse a raw ATIF trajectory.json into turns. Throws on unparseable JSON (callers show
  * the raw file instead); returns zero turns for a trajectory with no agent steps.
  *
- * One agent step = one turn — no merging across steps. The only steps not rendered are
- * structural no-ops (empty message, no tool calls — claude-code's tool_use boundary
- * steps), which carry nothing to show.
+ * Two step shapes exist in the wild:
+ * - terminus-2 / codex-style: one step = thought + its tool calls together → one step is
+ *   one turn.
+ * - claude-code-style (exploded): a thought step with no tools, then a structural no-op
+ *   step (empty message, no tools, stop_reason tool_use), then one `Executed <Tool>` step
+ *   per tool call. The real turn is the thought plus every tool step that follows it, so
+ *   no-op steps are DROPPED and tool-only steps COALESCE into the preceding thought turn.
+ *   Tool-only steps with no preceding thought turn stand alone.
  */
 export function parseAtifTurns(content: string): ParsedTurns {
   const data: AtifTrajectory = JSON.parse(content);
@@ -169,6 +174,13 @@ export function parseAtifTurns(content: string): ParsedTurns {
 
     const hasThought = !!thought?.trim();
     if (!hasThought && tools.length === 0) continue; // structural no-op (tool_use boundary)
+
+    const prev = turns[turns.length - 1];
+    if (!hasThought && prev?.thought) {
+      // Tool-only step following a thought turn: these are that thought's actions.
+      prev.tools.push(...tools);
+      continue;
+    }
 
     const ts = step.timestamp ? Date.parse(step.timestamp) : NaN;
     turns.push({
